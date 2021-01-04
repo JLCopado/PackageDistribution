@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObjectTranslation xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fields>
+        <help><!-- This is an old field that is no longer in use. --></help>
+        <label><!-- Deprecated --></label>
+        <name>SH2__Alert_Email__c</name>
+    </fields>
+    <fields>
+        <help><!-- Email addresses that will be sent usage alerts (multiple email addresses may be seperated by a comma EX: test@email.com,email@test.com). --></help>
+        <label><!-- Data Usage Alert Email Address --></label>
+        <name>SH2__Alert_Emails__c</name>
+    </fields>
+    <fields>
+        <help><!-- When the data usage reaches the input percentage a notification will be sent out. --></help>
+        <label><!-- Alert Threshold (In Percent) --></label>
+        <name>SH2__Alert_Threshold__c</name>
+    </fields>
+    <fields>
+        <help><!-- The value in this field is used to represent the cost of 500 MB of Data Storage. This should only change if you are purchasing data storage at a discounted rate. --></help>
+        <label><!-- Data Storage Cost --></label>
+        <name>SH2__Data_Storage_Cost__c</name>
+    </fields>
+    <fields>
+        <help><!-- With this setting enabled, it will force a record preview when creating a new Storage Recycle Job. --></help>
+        <label><!-- Force Record Preview On Creation --></label>
+        <name>SH2__Force_Preview__c</name>
+    </fields>
+    <fields>
+        <help><!-- This field in combination with the schedule unit field will determine how often Storage Helper will run if manually scheduled. --></help>
+        <label><!-- Schedule Increment --></label>
+        <name>SH2__Increment__c</name>
+    </fields>
+    <fields>
+        <label><!-- Last Notification Email Sent --></label>
+        <name>SH2__Last_Email_Sent__c</name>
+    </fields>
+    <fields>
+        <label><!-- Last Usage Tracking Run --></label>
+        <name>SH2__Last_Usage_Tracking_Run__c</name>
+    </fields>
+    <fields>
+        <help><!-- The maximum number of records that will be deleted each time Storage Helper is run. The maximum number of records that can be stored in the recycling bin is 25,000. --></help>
+        <label><!-- Maximum Number Of Records To Recycle --></label>
+        <name>SH2__Max_Records_To_Delete__c</name>
+    </fields>
+    <fields>
+        <help><!-- The number of months Storage Helper Backups will be kept for. If blank backups will be kept forever. --></help>
+        <label><!-- Number Of Months To Keep Backups --></label>
+        <name>SH2__Months_To_Keep_Backups__c</name>
+    </fields>
+    <fields>
+        <label><!-- Next Scheduled Run --></label>
+        <name>SH2__Next_Scheduled_Run__c</name>
+    </fields>
+    <fields>
+        <label><!-- Run Mode --></label>
+        <name>SH2__Run_Mode__c</name>
+    </fields>
+    <fields>
+        <help><!-- With this setting checked the Storage Helper new user tutorial will be enabled. The new user tutorial will walk you through the creation of your first Storage Recycle Job. --></help>
+        <label><!-- Show New User Tutorial --></label>
+        <name>SH2__Show_Tutorial__c</name>
+    </fields>
+    <fields>
+        <help><!-- With this setting checked a Storage Usage Tracking record will be created each month for every object in your environment. Please Note: this will consume data storage. --></help>
+        <label><!-- Track Monthly Object Usage --></label>
+        <name>SH2__Track_Object_Usage__c</name>
+    </fields>
+    <fields>
+        <help><!-- With this setting checked two Storage Usage Tracking records will be created each month to track storage usage. --></help>
+        <label><!-- Track Monthly Storage Usage --></label>
+        <name>SH2__Track_Storage_Usage__c</name>
+    </fields>
+    <fields>
+        <label><!-- Tutorial Step --></label>
+        <name>SH2__Tutorial_Step__c</name>
+    </fields>
+    <fields>
+        <help><!-- This field in combination with the schedule increment field will determine how often Storage Helper will run if manually scheduled. --></help>
+        <label><!-- Schedule Unit --></label>
+        <name>SH2__Unit__c</name>
+    </fields>
+    <fields>
+        <help><!-- When checked the Storage Recycle Job page refresh every time a user selects a different Storage Recycle Job. A URL parameter will be added that contains the settings ID. (Please Note: this setting is mainly used for troubleshooting purposes) --></help>
+        <label><!-- Update URL Parameters --></label>
+        <name>SH2__Update_Url_Param__c</name>
+    </fields>
+</CustomObjectTranslation>

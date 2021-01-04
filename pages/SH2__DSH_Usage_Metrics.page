@@ -1,0 +1,347 @@
+<apex:page controller="SH2.DSH_Usage_Metrics" sidebar="false" applyBodyTag="false" docType="html-5.0" showHeader="true">
+	<style>
+		.slds-scope [hidden], .slds-scope template{
+		    display: block;
+		}
+		.slds-scope .slds-button{
+            font-size: 14px;
+        }
+	</style>
+	<head> 
+        <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
+        <apex:includeScript value="{!$Resource.SH2__DSH_Utility_JS}"/>
+        <apex:stylesheet value="{! URLFOR($Resource.HS_Jquery, 'jquery-ui.min.css')}" />
+        <apex:includeScript value="{! URLFOR($Resource.HS_Jquery, 'jquery-1.12.1.min.js')}" />
+        <apex:includeScript value="{! URLFOR($Resource.HS_Jquery, 'jquery-ui.min.js')}" />
+    </head>
+
+    <script>
+    
+    var dsh = dsh || {};
+    dsh.j$ = jQuery.noConflict();
+
+    </script>
+
+    <body>
+    <apex:form >
+
+    	<apex:actionFunction name="createStorageCalculator" action="{!createStorageCalculator}" reRender="pageWarning" status="loading"/>
+    	<apex:actionFunction name="saveSettingConfig" action="{!saveTrackingSettings}" reRender="pageWarning" onComplete="document.getElementById('settings').style.display = 'none';" status="loading"/>
+
+	    <apex:slds />
+      	<div class="slds-scope">   
+	        <!-- PAGE HEADER -->
+	        <div class="slds-page-header" style="padding: 5px 24px 12px;" role="banner">
+	          
+	          <div class="slds-grid">
+	            
+	            <div class="slds-col">
+	              <div align="right">
+	              <apex:outputLink value="{!StandardSFStrageUsagePage}">Salesforce Storage Usage Page</apex:outputLink>
+	              </div><br/>
+	              <span>
+	              <h1 class="slds-text-heading_medium">Storage Usage Analytics</h1>
+	                <div class="slds-button slds-button_icon-border-filled slds-button_icon-small" style="height:32px;width:32px;">
+                    	<a href="javascript:void(0);" onClick="document.getElementById('settings').style.display = 'block';">
+                        <img src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/settings_60.png')}" style="padding:5px;"/>
+                        <span class="slds-assistive-text">Settings</span>
+                        </a>
+                    </div>
+                  </span>
+	            </div>
+	          </div>
+	        </div>
+
+	        <div id="settings" style="display:none;">
+	          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+	            <div class="slds-modal__container">
+	              <div class="slds-modal__header">
+	                <h2 class="slds-text-heading_medium">Storage Usage Tracking Settings</h2>
+	                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="document.getElementById('settings').style.display = 'none';">
+	                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+	                  <span class="slds-assistive-text">Close</span>
+	                </button>
+	              </div>
+	              <div class="slds-modal__content slds-p-around_small">
+	                    Track Data and File Storage:
+	                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#totalInfo').toggle();" onmouseout="dsh.j$('#totalInfo').toggle();"/><br/>
+	                    <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="totalInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none">
+                              <div class="slds-popover__body">Enables display of org level storage usage graphs.
+                              </div>
+                            </div>
+                        </div>
+	                    <apex:inputCheckbox style="height:17px;width:17px;" value="{!orgSettings.SH2__Track_Storage_Usage__c}"/>
+	                    <br/>
+	                    Track Object Storage:
+	                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#objectInfo').toggle();" onmouseout="dsh.j$('#objectInfo').toggle();"/><br/>
+	                    <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="objectInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none">
+                              <div class="slds-popover__body">Enables display of object level storage usage graphs. Please Note: Records will be created every month to track usage for each object.
+                              </div>
+                            </div>
+                        </div>
+	                    <apex:inputCheckbox style="height:17px;width:17px;" value="{!orgSettings.SH2__Track_Object_Usage__c}"/>
+	                    <br/><br/><br/>
+	              </div>
+	              <div class="slds-modal__footer">
+	                <div class="slds-x-small-buttons_horizontal">
+	                  <button type="button" class="slds-button slds-button_neutral" onClick="document.getElementById('settings').style.display = 'none';">Cancel</button>
+	                  <button type="button" class="slds-button slds-button_neutral" onclick="saveSettingConfig();">Save</button>
+	                </div>
+	              </div>
+	            </div>
+	          </div>
+	          <div class="slds-backdrop slds-backdrop_open"></div>
+	        </div>
+
+	        <apex:outputPanel id="pageWarning">
+	        <center>
+	        	<apex:outputPanel rendered="{!pageMessage != null}">
+	        		<div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px; width='100%';" role="alert">
+                    <b><apex:outputText escape="false" value="{!pageMessage}"/></b>
+                    </div>
+                    <br/>
+	        	</apex:outputPanel>
+	        </center>
+	        </apex:outputPanel>
+
+	        <apex:actionStatus id="loading" onstart="loading(true)" onstop="loading(false)" />
+
+	        <!-- LOADING SCREEN -->
+	        <div id="loading" style="display:none">
+	          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+	            <div class="slds-modal__container" style="min-width: 50px; width: 100px;">
+	              <div class="slds-modal__content slds-p-around_small">
+	              <center>
+	              <div class="slds-spinner_large" background="#16325c">
+	                  <img src="{! URLFOR($Asset.SLDS, 'assets/images/spinners/slds_spinner_brand.gif')}" alt="Loading..." />
+	              </div>
+	              </center>
+	              </div>
+	            </div>
+	          </div>
+	          <div class="slds-backdrop slds-backdrop_open"></div>
+	        </div>
+			<!-- / LOADING SCREEN -->
+		<center>
+		<apex:outputPanel id="suggestions">	
+	    <apex:outputPanel rendered="{!deletionSuggestions.size > 0}">
+	    	<div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px;" role="alert">
+	    	<div class="slds-text-longform">
+	    	<center><b>Storage Saving Suggestions</b></center>
+	    	<b>Please Note:</b> Record composition is only calculated for the top ten storage consumers.
+	    	<ul>
+		    <apex:repeat value="{!DeletionSuggestions}" var="s">
+		    	<li>
+		    	{!s.suggestionInfo} [&nbsp;<apex:commandLink style="color:blue;" value="Ignore" action="{!ignoreSuggestion}" rerender="suggestions">
+		    	<apex:param assignTo="{!suggestionToIgnore}" value="{!s.suggestionInfo}" name="ignore"/>
+		    	<apex:param assignTo="{!trackingRecToIgnore}" value="{!s.trackingId}" name="ignoreId"/>
+		    	</apex:commandLink>&nbsp;]
+		    	</li>
+		    </apex:repeat>
+		    </ul>
+		    </div>
+		    <apex:outputPanel rendered="{!hasIgnoredSuggestions}">
+		    	<br/>
+		    	<center>
+		    		<apex:commandLink style="color:blue;" value="Restore Ignored Suggestions" action="{!restoreIgnoredSuggestions}" rerender="suggestions"/>
+		    	</center>
+		    </apex:outputPanel>
+		    </div>
+	    </apex:outputPanel>
+	    <apex:outputPanel rendered="{!AND(deletionSuggestions.size == 0, hasIgnoredSuggestions)}">
+	    	<div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px;" role="alert">
+	    	<div class="slds-text-longform">
+	    	<center>
+	    		<b>You Have Ignored All Storage Saving Suggestions</b><br/>
+	    		<apex:commandLink style="color:blue;" value="Restore Ignored Suggestions" action="{!restoreIgnoredSuggestions}" rerender="suggestions"/>
+	    	</center>
+	    	</div>
+	    	</div>
+	    </apex:outputPanel>
+	    </apex:outputPanel>
+	    </center>
+
+	    <div class="slds-tabs_default">
+		  <ul class="slds-tabs_default__nav" role="tablist">
+		  	<apex:outputPanel rendered="{!OR(topTenObjectUsageTracking.size > 1, thisYearsDataStorage.size > 0, topTenObjectUsageIncrease.size > 1, totalUsageIncrease.size > 1)}">
+		    	<li id="tab1" class="slds-tabs__item slds-text-heading_label slds-active" title="Storage Usage Comparison" role="presentation"><a href="#" onclick="selectTab(1, 2);" role="tab" tabindex="0" aria-selected="false">General Storage Usage Charts</a></li>
+		    </apex:outputPanel>
+		    <apex:outputPanel rendered="{!allObjectUsageTracking.size > 0}">
+		    	<li id="tab2" class="slds-tabs__item slds-text-heading_label" title="Historical Object Usage" role="presentation"><a href="#" onclick="selectTab(2, 2);" role="tab" tabindex="-1" aria-selected="true">Historical Object Usage</a></li>
+		    </apex:outputPanel>
+		  </ul>
+		</div>
+
+	    </div>
+
+	    <table id="tab-default-1" style="display:block;">
+			<tr>
+				<apex:outputPanel rendered="{!topTenObjectUsageTracking.size > 1}">
+					<td width="600px" height="500px;">
+					<center>
+					<font size="6">Top Ten Storage Consumers</font>
+						<apex:chart height="400" width="500" data="{!topTenObjectUsageTracking}">
+					        <apex:pieSeries dataField="usage" labelField="name">
+					        <apex:chartLabel display="none" />
+					        <apex:chartTips height="75" width="150"/>
+					        </apex:pieSeries>
+					        <apex:legend position="right"/>
+					    </apex:chart>
+					</center>
+					</td>
+				</apex:outputPanel>
+				<apex:outputPanel rendered="{!topTenObjectUsageTracking.size > 1}">
+					<td width="600px" height="500px;">
+					<center>
+					<font size="6">Top Ten Storage Consumers</font>
+						<apex:chart data="{!topTenObjectUsageTracking}" height="400" width="500" theme="Salesforce">
+						    <apex:axis type="Numeric" position="left" title="Percent Of Total Usage" grid="true"
+						        fields="usage" dashSize="2" minimum="0">
+						        <apex:chartLabel />
+						    </apex:axis>
+						    <apex:axis type="Category" position="bottom" fields="name">
+						        <apex:chartLabel rotate="270"/>
+						    </apex:axis>
+						    <apex:barSeries orientation="vertical" axis="left" stacked="false"
+						        xField="name" yField="usage">
+						    	<apex:chartTips height="75" width="150"/>
+						    </apex:barSeries>    
+						</apex:chart>
+					</center>
+				    </td>
+			    </apex:outputPanel>
+			</tr>
+			<tr>
+				<apex:outputPanel rendered="{!thisYearsDataStorage.size > 0}">
+					<td width="600px" height="500px;">
+					<center>
+					<font size="6">Monthly Data Storage Comparison</font>
+					    <apex:chart data="{!thisYearsDataStorage}" height="400" width="500" theme="Salesforce">
+						    <apex:axis type="Numeric" position="left" title="Usage Percent" grid="true"
+						        fields="usage" dashSize="2" minimum="0">
+						        <apex:chartLabel />
+						    </apex:axis>
+						    <apex:axis type="Category" position="bottom" fields="name">
+						        <apex:chartLabel rotate="270"/>
+						    </apex:axis>
+						    <apex:barSeries orientation="vertical" axis="left" stacked="false"
+						        xField="name" yField="usage">
+						        <apex:chartTips height="75" width="150"/>
+						    </apex:barSeries>
+						</apex:chart>
+					</center>
+					</td>
+				</apex:outputPanel>
+				<apex:outputPanel rendered="{!thisYearsFileStorage.size > 0}">
+					<td width="600px" height="500px;">
+					<center>
+					<font size="6">Monthly File Storage Comparison</font>
+						<apex:chart data="{!thisYearsFileStorage}" height="400" width="500" theme="Salesforce">
+						    <apex:axis type="Numeric" position="left" title="Usage Percent" grid="true"
+						        fields="usage" dashSize="2" minimum="0">
+						        <apex:chartLabel />
+						    </apex:axis>
+						    <apex:axis type="Category" position="bottom" fields="name">
+						        <apex:chartLabel rotate="270"/>
+						    </apex:axis>
+						    <apex:barSeries orientation="vertical" axis="left" stacked="false"
+						        xField="name" yField="usage">
+						    	<apex:chartTips height="75" width="150"/>
+						    </apex:barSeries>
+						</apex:chart>
+					</center>
+					</td>
+				</apex:outputPanel>
+			</tr>
+			<tr>
+				<apex:outputPanel rendered="{!topTenObjectUsageIncrease.size > 1}">
+					<td width="600px" height="500px;">
+					<center>
+					<font size="6">Object Usage Increase From Last Month</font>
+					    <apex:chart data="{!topTenObjectUsageIncrease}" height="400" width="500" theme="Salesforce">
+						    <apex:axis type="Numeric" position="left" title="Percent Increase" grid="true"
+						        fields="usage" dashSize="2" minimum="0">
+						        <apex:chartLabel />
+						    </apex:axis>
+						    <apex:axis type="Category" position="bottom" fields="name">
+						        <apex:chartLabel rotate="270"/>
+						    </apex:axis>
+						    <apex:barSeries orientation="vertical" axis="left" stacked="false"
+						        xField="name" yField="usage">
+						    	<apex:chartTips height="75" width="150"/>
+						    </apex:barSeries>
+						</apex:chart>
+					</center>
+					</td>
+				</apex:outputPanel>
+				<apex:outputPanel rendered="{!totalUsageIncrease.size > 1}">
+					<td width="600px" height="500px;">
+					<center>
+					<font size="6">Storage Usage Increase From Last Month</font>
+					    <apex:chart data="{!totalUsageIncrease}" height="400" width="500" theme="Salesforce">
+						    <apex:axis type="Numeric" position="left" title="Percent Increase" grid="true"
+						        fields="usage" dashSize="2" minimum="0">
+						        <apex:chartLabel />
+						    </apex:axis>
+						    <apex:axis type="Category" position="bottom" fields="name">
+						        <apex:chartLabel rotate="270"/>
+						    </apex:axis>
+						    <apex:barSeries orientation="vertical" axis="left" stacked="false"
+						        xField="name" yField="usage">
+						    	<apex:chartTips height="75" width="150"/>
+						    </apex:barSeries>
+						</apex:chart>
+					</center>
+					</td>
+				</apex:outputPanel>
+			</tr>
+		</table>
+
+		<div id="tab-default-2" style="display:none;">
+			<center>
+				<div width="600px" height="550px;">
+				<apex:outputPanel rendered="{!allObjectUsageTracking.size > 0}">
+				<font size="4">
+				<center>
+				<br/>Select Object For Historical Usage:<br/>
+				<apex:selectList styleClass="slds-select .is-required" id="objectList" size="1" value="{!selectedObject}">
+			    	<apex:actionSupport event="onchange" rerender="objTrend" status="loading"/>
+			    	<apex:selectOptions value="{!ObjectsWithTrackingRecords}"/>
+			    </apex:selectList>
+			    </center>
+			    </font>
+			    </apex:outputPanel>
+		    	<apex:outputPanel id="objTrend" rendered="{!ObjectsWithTrackingRecords.size > 1}">
+		    	<apex:outputPanel rendered="{!AND(selectedObject != '', selectedObject != null)}">
+		    	<center>
+			    	<apex:chart data="{!TrackingRecordsForObject}" height="400" width="500" theme="Salesforce">
+					    <apex:axis type="Numeric" position="left" title="Percent Of Total Usage" grid="true"
+					        fields="usage" dashSize="2" minimum="0">
+					        <apex:chartLabel />
+					    </apex:axis>
+					    <apex:axis type="Category" position="bottom" fields="name">
+					        <apex:chartLabel rotate="270"/>
+					    </apex:axis>
+					    <apex:barSeries orientation="vertical" axis="left" stacked="false"
+					        xField="name" yField="usage">
+					    	<apex:chartTips height="75" width="150"/>
+					    </apex:barSeries>
+					</apex:chart>
+				</center>
+		    	</apex:outputPanel>
+		    	</apex:outputPanel>
+			    </div>
+			</center>
+		</div>
+	</apex:form>
+	</body>
+	<script>
+		if({!topTenObjectUsageTracking.size} <= 1 && {!thisYearsDataStorage.size} == 0 && {!topTenObjectUsageIncrease.size} <= 1 && {!totalUsageIncrease.size} <= 1 && {!allObjectUsageTracking.size} > 0){
+	    	document.getElementById('tab2').className = 'slds-tabs__item slds-text-heading_label slds-active';
+	    	document.getElementById('tab-default-1').style.display= 'none';
+	 		document.getElementById('tab-default-2').style.display= 'block';
+		}
+	</script>
+</apex:page>

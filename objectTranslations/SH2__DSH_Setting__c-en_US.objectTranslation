@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObjectTranslation xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fields>
+        <label><!-- Active --></label>
+        <name>SH2__Active__c</name>
+    </fields>
+    <fields>
+        <label><!-- Backup Mode --></label>
+        <name>SH2__Backup_Mode__c</name>
+        <picklistValues>
+            <masterLabel>Backup All Fields</masterLabel>
+            <translation><!-- Backup All Fields --></translation>
+        </picklistValues>
+        <picklistValues>
+            <masterLabel>Off</masterLabel>
+            <translation><!-- Off --></translation>
+        </picklistValues>
+        <picklistValues>
+            <masterLabel>Select Fields To Backup</masterLabel>
+            <translation><!-- Select Fields To Backup --></translation>
+        </picklistValues>
+    </fields>
+    <fields>
+        <label><!-- Batch Scope Size --></label>
+        <name>SH2__Batch_Scope__c</name>
+    </fields>
+    <fields>
+        <label><!-- Child Fields To Backup --></label>
+        <name>SH2__Child_Fields_To_Backup__c</name>
+    </fields>
+    <fields>
+        <label><!-- Child Objects To Recycle --></label>
+        <name>SH2__Child_Objects_To_Recycle__c</name>
+    </fields>
+    <fields>
+        <label><!-- Current Record Count --></label>
+        <name>SH2__Current_Record_Count__c</name>
+    </fields>
+    <fields>
+        <label><!-- Deletion Order --></label>
+        <name>SH2__Deletion_Order__c</name>
+    </fields>
+    <fields>
+        <label><!-- Fields To Backup --></label>
+        <name>SH2__Fields_To_Backup__c</name>
+    </fields>
+    <fields>
+        <label><!-- Filter Logic --></label>
+        <name>SH2__Filter_Logic__c</name>
+    </fields>
+    <fields>
+        <label><!-- Hard Delete Records --></label>
+        <name>SH2__Hard_Delete__c</name>
+    </fields>
+    <fields>
+        <label><!-- Index Archived Records --></label>
+        <name>SH2__Index_Archived_Records__c</name>
+    </fields>
+    <fields>
+        <label><!-- Most Recent Data Cleanup --></label>
+        <name>SH2__Most_Recent_Data_Cleanup__c</name>
+    </fields>
+    <fields>
+        <label><!-- Notes --></label>
+        <name>SH2__Notes__c</name>
+    </fields>
+    <fields>
+        <label><!-- Number Of Records Recycled Last Run --></label>
+        <name>SH2__Number_Of_Records__c</name>
+    </fields>
+    <fields>
+        <label><!-- Object --></label>
+        <name>SH2__Object__c</name>
+    </fields>
+    <fields>
+        <label><!-- Percent Complete --></label>
+        <name>SH2__Percent_Complete__c</name>
+    </fields>
+    <fields>
+        <label><!-- Status --></label>
+        <name>SH2__Status__c</name>
+        <picklistValues>
+            <masterLabel>Backing Up Child Records</masterLabel>
+            <translation><!-- Backing Up Child Records --></translation>
+        </picklistValues>
+        <picklistValues>
+            <masterLabel>Calculating Number Of Child Records</masterLabel>
+            <translation><!-- Calculating Number Of Child Records --></translation>
+        </picklistValues>
+        <picklistValues>
+            <masterLabel>Complete</masterLabel>
+            <translation><!-- Complete --></translation>
+        </picklistValues>
+        <picklistValues>
+            <masterLabel>Error</masterLabel>
+            <translation><!-- Error --></translation>
+        </picklistValues>
+        <picklistValues>
+            <masterLabel>Running</masterLabel>
+            <translation><!-- Running --></translation>
+        </picklistValues>
+    </fields>
+</CustomObjectTranslation>

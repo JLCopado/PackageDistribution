@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObjectTranslation xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fields>
+        <label><!-- Compositions To Ignore --></label>
+        <name>SH2__Ignore__c</name>
+    </fields>
+    <fields>
+        <help><!-- Storage usage increase from last month. --></help>
+        <label><!-- Storage Usage Increase From Last Month --></label>
+        <name>SH2__Increase_From_Last_Month__c</name>
+    </fields>
+    <fields>
+        <label><!-- Number Of Records --></label>
+        <name>SH2__Number_Of_Records__c</name>
+    </fields>
+    <fields>
+        <label><!-- Object - Month And Year --></label>
+        <name>SH2__Object_Month_Year__c</name>
+    </fields>
+    <fields>
+        <label><!-- Object Prefix --></label>
+        <name>SH2__Object_Prefix__c</name>
+    </fields>
+    <fields>
+        <label><!-- Object --></label>
+        <name>SH2__Object__c</name>
+    </fields>
+    <fields>
+        <help><!-- Percent of total storage usage that is used by this object. --></help>
+        <label><!-- Percent Of Usage --></label>
+        <name>SH2__Percent_Of_Usage__c</name>
+    </fields>
+    <fields>
+        <label><!-- Record Composition --></label>
+        <name>SH2__Record_Composition__c</name>
+    </fields>
+    <fields>
+        <label><!-- Storage Usage --></label>
+        <name>SH2__Storage_Usage__c</name>
+    </fields>
+</CustomObjectTranslation>

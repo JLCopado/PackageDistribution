@@ -1,0 +1,2349 @@
+<apex:page controller="SH2.DSH_Setting_Management_Controller" extensions="SH2.DSH_Savings_Info,SH2.DSH_Preview_Info,SH2.DSH_SRJ_Get_Methods,SH2.DSH_Filter_Get_Methods,SH2.DSH_SRJ_Modifier,SH2.DSH_Filter_Modifier" sidebar="false" applyBodyTag="false" docType="html-5.0" action="{!createUserSettings}" showHeader="true">
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <head> 
+        <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>        
+        <apex:stylesheet value="{! URLFOR($Resource.HS_Jquery, 'jquery-ui.min.css')}" />
+        <apex:includeScript value="{! URLFOR($Resource.HS_Jquery, 'jquery-1.12.1.min.js')}" />
+        <apex:includeScript value="{! URLFOR($Resource.HS_Jquery, 'jquery-ui.min.js')}" />
+         
+        <apex:stylesheet value="{!$Resource.SH2__PT_TimePicker_CSS}"/>
+        <apex:includeScript value="{!$Resource.SH2__PT_TimePicker_JS}"/>
+        
+        <apex:includeScript value="{!$Resource.SH2__DSH_Utility_JS}"/>
+        
+    </head>
+    
+    <style>
+        
+        tr[class="slds-hint-parent"] { }
+        #datePicker {
+          z-index: 10000;
+        }
+
+        .lookupHoverDetail {
+            z-index: 10000;
+        }
+
+        @-webkit-keyframes borderBlink {    
+            from, to {    
+                border-color: transparent    
+            }    
+            50% {    
+                border-color: #54698d;    
+            }    
+        }    
+        @keyframes borderBlink {    
+            from, to {    
+                border-color: transparent    
+            }    
+            50% {    
+                border-color: #54698d;    
+            }    
+        }    
+        .borderBlink{    
+            border:3px solid !important;
+            border-color: #54698d !important;
+            -webkit-animation: borderBlink 2s step-end infinite;    
+            animation: borderBlink 2s step-end infinite;   
+        }
+        .slds-scope .slds-button{
+            font-size: 14px;
+        }
+        
+    </style>
+    
+    <script>
+    
+    var dsh = dsh || {};
+    dsh.j$ = jQuery.noConflict();
+
+    function updateStep(stepNum, currentStep, error){
+        if(currentStep != 'disabled' && (error == null || !error)){
+            for(i = 0; i < 11; i++){
+                dsh.j$("[Id$='step" + i + "']").removeClass("borderBlink");
+            }
+            dsh.j$("[Id$='" + stepNum + "']").addClass("borderBlink");
+            updateStepNumber(stepNum);
+        }
+    }
+
+    function updateSetting(){
+        if(!isBlank(dsh.j$("[Id$='editObjectList']").val())){ 
+            updateSettingAction();
+        }
+        else{
+            showElement('EditSettingObjectError');
+        }
+    }
+    
+    function previewRecords(){
+        displayRecordPreview();
+    }
+    
+    function selectSetting(settingId, nameError, context){
+        if(!isBlank(settingId) && isBlank(nameError)){
+            selectSettingAction(settingId);
+        }
+        processSelectedSetting(settingId, nameError, context);
+    }
+    
+    function saveSettingConfig(){
+        validEmail = true;
+        var payingCustomer = {!IsPayingCustomer};
+        
+        if(!isBlank(dsh.j$("[Id$='emailAddress']").val())){
+          for(i = 0; i < dsh.j$("[Id$='emailAddress']").val().split(',').length; i++){
+            if(!isValidEmail(dsh.j$("[Id$='emailAddress']").val().split(',')[i].trim())){
+              validEmail = false;
+            }
+          }
+        }
+        
+        if((isBlank(dsh.j$("[Id$='emailAddress']").val()) || validEmail) && (!isGreaterThanMaxLimit(dsh.j$("[Id$='maxRecordsToDelete']").val(), payingCustomer) || isBlank(dsh.j$("[Id$='maxRecordsToDelete']").val()))){
+            settingConfigUpdate();
+            hideSettingConfig();
+        }else{
+            if(isGreaterThanMaxLimit(dsh.j$("[Id$='maxRecordsToDelete']").val(), payingCustomer)){
+              showElement('maxRecordsError');
+            }else{
+              showElement('emailError');
+            }
+        }
+    }
+    
+    function newSetting(){
+        clearSelectedCriterionAndUpdateStep();
+        showElement('newSetting');
+    }
+    
+    function newSettingFilter(){
+        if(!isBlank(dsh.j$("[Id$='objectList']").val())){
+            saveSetting();
+        }
+        else{
+            showElement('NewSettingObjectError');
+        }
+    }
+    
+    function saveSettingCriteria(hasFilterCriteriaVariable){
+        if(isValidFilter(hasFilterCriteriaVariable)){
+            saveCriteria();
+            hideNewCriteriaVariableError();
+        }else{
+          if(isBlank(dsh.j$("[Id$='newFilterCon']").val())){
+            showElement('newCriteriaVariableError');
+          }
+          else if(isBlank(dsh.j$("[Id$='objFields']").val())){
+            showElement('NewCriteriaFieldError');
+          }
+          else{
+            showElement('NewCriteriaOperError');
+          }
+        }
+    }
+    
+    function activateSetting(){
+        activate();
+        hideAllModals();
+    }
+    
+    function updateSettingCriteria(hasFilterCriteriaVariable){
+        if(!isBlank(dsh.j$("[Id$='filterField']").val()) && !isBlank(dsh.j$("[Id$='EditCriteriaOper']").val()) && (!hasFilterCriteriaVariable || (hasFilterCriteriaVariable && !isBlank(dsh.j$("[Id$='editFilterCon']").val())))){
+            updateCriteria();
+            hideEditCriteriaVariableError();
+        }else{
+          if(isBlank(dsh.j$("[Id$='editFilterCon']").val())){
+            showElement('editCriteriaVariableError');
+          }
+          else if(isBlank(dsh.j$("[Id$='filterField']").val())){
+            showElement('EditCriteriaFieldError');
+          }else{
+            showElement('EditCriteriaOperError');
+          }
+        }
+    }
+    
+    function hideNewCriterionAfterSave(error, active, showBackupConfigModal){
+        if(isBlank(error)){
+            if(showBackupConfigModal){
+              showElement('backupConfig');
+            }
+            clearSelectedCriterion();
+            hideElement('newCriterion');
+            hideElement('newConditionError');
+        }else{
+            showElement('newCriterion');
+            showError(error, 'newConditionError');
+        }
+    }
+    
+    function hideEditCriterionAfterSave(error){
+        if(isBlank(error)){
+            clearSelectedCriterion();
+            hideElement('editCriterion');
+            hideElement('editConditionError');
+        }else{
+            showElement('editCriterion');
+            showError(error, 'editConditionError');
+        }
+    }
+    
+    function hideChildBackupConfig(){
+        hideElement('cascadeDeleteObjectList');
+        showElement('backupConfig');
+    }
+    
+    function showAdditionalCriterionModal(error){
+        if(isBlank(error)){
+          addCriterion();
+          showElement('newCriterion');
+        }else{
+          showElement('newCriterion');
+          showError(error, 'newConditionError');
+        }
+    }
+    
+    function editCriterion(criterionId){
+        selectCriterionAction(criterionId);
+        showElement('editCriterion');
+    }
+    
+    function deleteSettingButton(){
+        showElement('deletionWarning');
+    }
+    
+    function addAdditionalCriteria(){
+        clearSelectedCriterion();
+        showElement('newCriterion');
+        shouldNotShowBackupConfig();
+    }
+    
+    function addCriteria(){
+        showElement('newCriterion');
+    }
+    
+    function updateFilterLogic(){
+        editLogic();
+    }
+    
+    function addAdditionalCriterion(){
+        addSettingCriteria();
+    }
+    
+    function deleteSelectedCriterion(criterionId){
+        if(confirm('Are you sure you would like to delete a filter criterion?  Deleting all filter criteria will cause the setting to be deactivated.')){
+            deleteCriterionAction(criterionId);
+            rerenderSettingTable();
+        }
+    }
+    
+    function saveSchedule(){
+      if(dsh.j$("[Id$='selectedRunMode']").val() == 'Scheduled'){
+        if(!isBlank(dsh.j$("[Id$='nextRun']").val()) && !isBlank(dsh.j$("[Id$='increment']").val()) && dsh.j$("[Id$='increment']").val() > 0 && dsh.j$("[Id$='increment']").val().indexOf('.') < 0){
+          scheduleUpdate();
+        }else{
+          if(isBlank(dsh.j$("[Id$='nextRun']").val())){
+            showElement('nextRunError');
+          }
+          if(isBlank(dsh.j$("[Id$='increment']").val()) || dsh.j$("[Id$='increment']").val() < 1 || dsh.j$("[Id$='increment']").val().indexOf('.') >= 0){
+            showElement('incrementError');
+          }
+        }
+      }else{
+        scheduleUpdate();
+      }
+    }
+    
+    function editSchedule(){
+        showElement('editSchedule');
+    }
+    
+    function changeRunMode(){
+        hideSettingConfig();
+        showElement('editSchedule');
+    }
+    
+    function clearCascadeDeleteSettings(){
+        cleanBackupController();
+        hideChildBackupModal();
+    }
+
+    </script> 
+    
+<body>   
+<apex:form id="theForm">
+    <!-- Setting Action Function -->
+    <apex:actionFunction name="saveSetting" action="{!saveNewSetting}" reRender="infoPanel, allSettings, newSettingFields, editSettingFields, criterionModal, newAndRunButtons, msgs, manualRunComponent, backupSettingFields, backupDownloadConfig" status="loading" onComplete="selectSetting('{!srjInfo.selectedSetting.Id}', {!srjInfo.dupeSettingName}, 'New');updateStep('step5', '{!TutorialStep}', {!srjInfo.dupeSettingName});"/>
+    <apex:actionFunction name="selectSettingAction" action="{!updateSelectedSetting}" rerender="infoPanel, filterLogic, EditCriterionModal, editSettingFields, backupSettingFields, backupDownloadConfig, msgs, cascadeDeleteObjects, deletionWarningMessage, deletionButtons" status="loading">
+    <apex:param id="selectedSetting" name="s" value="" assignTo="{!srjInfo.selectedSettingId}"/>
+    </apex:actionFunction>
+    <apex:actionFunction name="updateSelectedSettingAction" action="{!updateSelectedSetting}" rerender="infoPanel, filterLogic, EditCriterionModal, editSettingFields, criterionModal, backupSettingFields, backupDownloadConfig, cascadeDeleteObjects, deletionWarningMessage, deletionButtons" status="loading" onComplete="processSelectedSetting('{!srjInfo.selectedSettingId}', '', '');">
+    <apex:param id="selectedSettingActionId" name="sId" value="" assignTo="{!srjInfo.selectedSettingId}"/>
+    </apex:actionFunction>
+    <apex:actionFunction name="activate" action="{!activateSelectedSetting}" rerender="infoPanel, allSettings, manualRunComponent" status="loading" onComplete="selectSetting('{!srjInfo.selectedSetting.Id}', '', '');"/>
+    <apex:actionFunction name="deleteSeletedSetting" action="{!deleteSetting}" reRender="allSettings, infoPanel, newAndRunButtons, manualRunComponent, criterionModal, backupDownloadConfig, cascadeDeleteObjects" status="loading" onComplete="selectSetting('{!srjInfo.selectedSetting.Id}', '', '');"/>
+    <apex:actionFunction name="editLogic" action="{!editFilterLogic}" reRender="filterLogic" status="loading"/>
+    <apex:actionFunction name="updateSettingAction" action="{!updateSetting}" rerender="infoPanel, allSettings, editSettingFields, msgs, manualRunComponent" status="loading" onComplete="selectSetting('{!srjInfo.selectedSetting.Id}', {!srjInfo.dupeSettingName}, 'Edit');"/>
+    <apex:actionFunction name="updateListOfChildRecordsToDelete" action="{!updateListOfChildRecordsToDelete}" rerender="none" status="loading">
+    <apex:param name="context" value="" assignTo="{!context}"/>
+    <apex:param name="childObjectToDelete" value="" assignTo="{!srjInfo.childObjectToDelete}"/>
+    </apex:actionFunction>
+    <apex:actionFunction name="displayRecordPreview" action="{!reRenderRecordPreview}" rerender="preview" status="loading" oncomplete="showElement('recordPreview');"/>
+    <apex:actionFunction name="cleanBackupController" action="{!clearCascadeBackupController}" rerender="backupChildWarning, cascadeDeleteFields" status="loading" onComplete="showElement('backupConfig');">
+    <apex:param name="blankChildObj" value="" assignTo="{!srjInfo.cascadeDeleteObject}"/>
+    </apex:actionFunction>
+    <apex:actionFunction name="clearPreviewCount" action="{!srjInfo.clearCurrentRecordCount}" rerender="savingsCalculation"/>
+    <apex:actionFunction name="runSettings" action="{!runSelectedSettings}" rerender="allSettings, manualRunComponent, manualRunButton, msgs" status="loading" oncomplete="hideElement('manualRun'); processSelectedSetting('{!srjInfo.selectedSettingId}', false, '');"/>
+    <apex:actionFunction name="sortColumn" action="{!updateSortOrder}" reRender="settingTable" onComplete="processSelectedSetting('{!srjInfo.selectedSettingId}', false, '');" status="loading">
+    <apex:param name="f" value="" assignTo="{!sortField}"/>
+    </apex:actionFunction>
+    
+    <!-- Criterion Action Functions -->
+    <apex:actionFunction name="selectCriterionAction" action="{!updateSelectedCriterion}" rerender="EditCriterionModal, editCriterionButtons, msg" oncomplete="setFildSelectListSize('edit', {!ParentFieldListForEditCriterion.size});" status="loading">
+      <apex:param id="selectedCriterion" name="c" value="" assignTo="{!filterInfo.selectedCriterionId}"/>
+    </apex:actionFunction>
+    <apex:actionFunction name="addSettingCriteria" action="{!saveNewCriterion}" reRender="criterionModal, editCriterionModal, criteriaPanel, changeLogicButton, msgs" oncomplete="showAdditionalCriterionModal('{!JSENCODE(filterInfo.invalidFilterCriteriaMessage)}');" status="loading"/>
+    <apex:actionFunction name="saveCriteria" action="{!saveNewCriterion}" reRender="criterionModal, editCriterionModal, criteriaPanel, changeLogicButton, srjConfigButtons, msgs"  oncomplete="hideNewCriterionAfterSave('{!JSENCODE(filterInfo.invalidFilterCriteriaMessage)}');" status="loading"/>
+    <apex:actionFunction name="updateCriteria" action="{!saveNewCriterion}" reRender="criterionModal, editCriterionModal, criteriaPanel, changeLogicButton, msgs" oncomplete="hideEditCriterionAfterSave('{!JSENCODE(filterInfo.invalidFilterCriteriaMessage)}');" status="loading"/>
+    <apex:actionFunction name="deleteCriterionAction" action="{!deleteCriterion}" rerender="criteriaPanel, changeLogicButton, msg" status="loading">
+    <apex:param id="selectedCriterionToDelete" name="d" value="" assignTo="{!filterInfo.selectedCriterionId}"/>
+    </apex:actionFunction>
+    <apex:actionFunction name="clearSelectedCriterion" action="{!clearSettingCriterion}" rerender="selectedCriterion, objFields, EditCriterionModal, criterionModal, newSettingFields" status="loading"/>
+    <apex:actionFunction name="clearSelectedCriterionAndUpdateStep" action="{!clearSettingCriterion}" rerender="selectedCriterion, objFields, EditCriterionModal, criterionModal, newSettingFields" oncomplete="updateStep('step3', '{!TutorialStep}', false);" status="loading"/>
+    <apex:actionFunction name="addCriterion" action="{!filterInfo.clearCriterion}" rerender="criterionModal" oncomplete="updateStep('step5', '{!TutorialStep}', false);" status="loading"/>
+    <apex:actionFunction name="shouldNotShowBackupConfig" action="{!backupInfo.dontDisplayBackupConfig}" rerender="none"/>
+    <apex:actionFunction name="rerenderSettingTable" rerender="settingTable, allSettings"/>
+    
+    <!-- Config Action Functions -->
+    <apex:actionFunction name="settingConfigUpdate" action="{!updateSettingConfig}" rerender="settingConfig, dataUsage, msgs, runJobPopover, dataExportError, activationNotification" status="loading"/>
+    <apex:actionFunction name="updateStepNumber" action="{!updateTutorialStage}" rerender="newUserInfo">
+    <apex:param name="tutorial" value="" assignTo="{!tutorialStage}"/>
+    </apex:actionFunction>
+        
+    <!-- Scheduled Run Functions -->
+    <apex:actionFunction name="scheduleUpdate" action="{!updateSettingConfig}" rerender="settingConfig, dataUsage, msgs, runJobPopover, currentRunMode, scheduleInputs" oncomplete="hideEditSchedule('{!srjInfo.invalidSchedule}');" status="loading"/>
+    
+    <apex:actionStatus id="loading" onstart="loading(true)" onstop="loading(false)" />
+    
+      <!-- REQUIRED SLDS WRAPPER -->
+      <apex:slds />
+      <div class="slds-scope" role="main">
+      <apex:outputPanel id="newUserInfo">
+      <center>
+        <apex:outputPanel id="newUserInfoText" rendered="{!tutorialStep != 'disabled'}" styleClass="slds-notify slds-notify_toast slds-theme_warning" style="z-index:20000;max-width:500px;position:fixed;bottom:0%;right:0%;">
+        <b>
+            <apex:outputPanel rendered="{!tutorialStep == 'step1'}">
+                Before configuring your first Storage Recycle Job, it is best to make sure the Storage Helper configuration is correct. 
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step1.1'}" style="max-width:100px;">
+                Review the configuration and confirm that it meets the needs of your organizations. Once complete you may click the 'Change Run Mode' button to select how you would like Storage Helper to run, or click 'Save'.
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step1.2'}">
+                There are the three differnt ways to run Storage Helper. You man run Manually, automatically after a Salesforce data exports has occured, or on a defined schedule. Please select the option that fits the needs of your organization then click 'Save'.
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step2'}">
+                Now that you have updated the Storage Helper configuration, you may begin the creation of a new Storage Recycle Job. 
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step3'}">
+                The first thing that needs to be done when creating a new Storage Recycle Job is selecting the object that you would like Storage Helper to delete records for. 
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step4'}">
+                After selecting the object confirm that you have named your Storage Recycle Job, and that the other options are configured correctly. Once done you may click next. 
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step5'}">
+                The Storage Recycle Job has now been created! Now you may create the criteria that a record will have to meet in order for it to be deleted by Storage Helper. First select a field you would like to filter on. 
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step6'}">
+                Once the field is selected you may now select the logic to use for the filter. 
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step7'}">
+                Now populate the value to filter on. 
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step8'}">
+                After reviewing that the filter defined is correct you may either create another filter, or save and move on to the next step. 
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step9'}">
+                You may now configure how you would like your records backed up. We highly suggest backing up all fields but there is also the option to select the fields to backup or turn backups off.
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step10'}">
+                <apex:outputPanel rendered="{!AND(settingConfig.SH2__Force_Preview__c, renderRecordPreview, previewController.pT.objectCount>0)}">
+                    Please confirm the records in the preview list should be deleted. Once done reviewing may activate the job or keep the setting inactive if records that should not be deleted are in the list.
+                </apex:outputPanel>
+                <apex:outputPanel rendered="{!OR(!settingConfig.SH2__Force_Preview__c, !renderRecordPreview, previewController.pT.objectCount == 0)}">
+                    We suggest previewing the records before activating the Job, however if you are confident the configuration is correct you may click the activate button.
+
+                    If you would like to preview the records you may click the 'Keep Inactive' button and click the 'Preview Records' button to confirm that the records in the list should be deleted. 
+                </apex:outputPanel>
+            </apex:outputPanel>
+            <apex:outputPanel rendered="{!tutorialStep == 'step11'}">
+                <div class="slds-text-longform">
+                 The creation of the new Storage Recycle Job is complete! To modify the newly created Storage Recycle Job the panel on the right under the 'New Storage Recycle Job' and 'Run' buttons may be used.
+                 <ul>  
+                    <li>The details tab is used to preview records and modify things like the name, object, and if the Storage Recycle Job is active.</li>
+                    <li>The filters tab is used to modify and add new filter criteria.</li>
+                    <li>The backup tab is used to modify the backup configuration.</li>
+                 </ul>
+                 </div>
+            </apex:outputPanel>
+            <br/>
+            <apex:commandButton value="Hide Tutorial" action="{!disableTutorial}" styleclass="slds-button slds-button_neutral" style="float: right;"/>
+        </b>
+        </apex:outputPanel>
+      </center>
+      </apex:outputPanel>
+        <!-- PAGE HEADER -->
+        <div class="slds-page-header" style="padding-top:5px;" role="banner">
+          <apex:commandLink action="{!showTutorial}" style="float: right;padding-top:0px;" rendered="{!tutorialStep == 'disabled'}" value="Display Tutorial"/><br/>  
+          <div class="slds-grid">
+            <div class="slds-col slds-p-around_small">
+              <apex:outputPanel id="runJobPopover">
+                  <apex:outputPanel rendered="{!RunJobOff}">
+                    <div class="slds-popover slds-nubbin_bottom-right slds-theme_info" role="dialog">
+                      <div class="slds-popover__body">
+                        Storage Helper has not been configured to run Automatically. If you would like Storage Helper to run automatically please click the gear icon below, then click the 'Change Run Mode' button.
+                      </div>
+                    </div>
+                    <br/>
+                  </apex:outputPanel>
+              </apex:outputPanel>
+            </div>
+          </div>
+          
+          <div class="slds-grid">
+            
+            <div class="slds-col">
+              <span>
+              <h1 class="slds-text-heading_medium">All Storage Recycle Jobs&nbsp;&nbsp;</h1>
+                <apex:commandButton styleClass="slds-button slds-button_neutral" onclick="showElement('helpScreen');" value="FAQ" rerender="none"/>
+                <apex:outputPanel id="settingsButton">
+                  <div id="step1" class="{!IF(tutorialStep == 'step1', 'borderBlink', '')}" style="max-width:38px;display:inline-block;">
+                    <div class="slds-button slds-button_icon-border-filled slds-button_icon-small" style="height:32px;width:32px;">
+                    <a href="javascript:void(0);" onClick="showElement('settingConfig');updateStep('step1.1', '{!TutorialStep}', false);">
+                        <img src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/settings_60.png')}" style="padding:5px;"/>
+                      <span class="slds-assistive-text">Settings</span>
+                    </a>
+                    </div>
+                  </div>
+                </apex:outputPanel>
+              </span>
+            </div>
+        
+            <div class="slds-col slds-no-flex slds-align-middle">
+         
+              <div class="slds-button-group" role="group">
+                <apex:outputPanel id="newAndRunButtons">
+                <apex:outputPanel id="newButton" rendered="{!settingObjAccessible}">  
+                    <apex:commandButton id="step2" value="New Storage Recycle Job" styleclass="slds-button slds-button_neutral" onclick="newSetting();" reRender="none"/>
+                </apex:outputPanel>
+                <apex:outputPanel rendered="{!AND(nfpController.isNonprofit, NOT(IsPayingCustomer))}">
+                    <button type="button" class="slds-button slds-button_neutral" onclick="showElement('nfpDiscount');">
+                      Get Nonprofit Coupon Code 
+                    </button>
+                </apex:outputPanel>
+                <apex:outputPanel id="runButton" rendered="{!AND(IF(srjInfo.numberOfSettings == 0, false, true), HasNotHitLimit)}">
+                    <apex:commandButton value="Run" styleclass="slds-button slds-button_neutral" onclick="showElement('manualRun');" reRender="none"/>
+                </apex:outputPanel>
+                </apex:outputPanel>
+              </div>
+         
+            </div>
+         
+          </div>
+         
+        </div>
+        <!-- / PAGE HEADER --> 
+      
+        <div class="slds-grid" style="min-width: 100px;">
+<!-- Settings Table -->   
+        <div class="slds-col slds-col-rule_right slds-p-right_large slds-small-size_1-of-2 slds-medium-size_3-of-5 slds_large-size_8-of-12" style="min-width: 100px;">
+         <apex:pageMessages id="msgs" />
+          <div class="slds-card" style="min-width: 100px;">
+            <section class="slds-card__body" style="min-width: 100px;">
+              <div class="slds-scrollable_x" style="min-width: 100px;">
+                <apex:outputPanel id="allSettings">
+                  
+                <apex:outputPanel id="freeWarning" rendered="{!!HasNotHitLimit}">
+                  <center>
+                  <div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px">
+                    <center>
+                    <b>You have deleted more than 20,000 records this month. To delete more records monthly the premium version is required.&nbsp;<apex:outputLink style="color:blue" target="_blank" value="http://www.passagetechnology.com/helper-suite-order">Click here to purchase the premium version.</apex:outputLink></b>
+                    </center>
+                  </div>
+                  </center>
+                </apex:outputPanel>
+                
+                <apex:outputPanel id="settingTable" rendered="{!IF(srjInfo.numberOfSettings > 0, true, false)}" style="min-width: 100px;">
+                <table class="slds-table slds-table_bordered slds-max-medium-table_stacked-horizontal" style="min-width: 100px;">
+                  <thead>
+                    <tr class="slds-no-hover">
+                      <th class="slds-text-heading_label slds-size_5-of-12 slds-is-sortable" sorted="reversed" scope="col"><a onclick="sortColumn('name');">Name</a><apex:outputText value="{!IF(sortField=='name', IF(sortDirection=='asc', ' ▲', ' ▼'),' ')}"/></th>
+                      <th class="slds-text-heading_label slds-size_2-of-12 slds-is-sortable" scope="col"><a onclick="sortColumn('object__c');">Object Name</a><apex:outputText value="{!IF(sortField=='object__c', IF(sortDirection=='asc', ' ▲', ' ▼'),'')}"/></th>
+                      <th class="slds-text-heading_label slds-size_1-of-12 slds-is-sortable" scope="col"><a onclick="sortColumn('createdDate');">Created Date</a><apex:outputText value="{!IF(sortField=='createdDate', IF(sortDirection=='asc', ' ▲', ' ▼'),'')}"/></th>
+                      <th class="slds-text-heading_label slds-size_2-of-12" scope="col"><center>Status</center></th>
+                      <th class="slds-text-heading_label slds-size_1-of-12" scope="col"><center>Deletion Order</center></th>
+                      <th class="slds-text-heading_label slds-size_1-of-12" scope="col"><center>Active</center></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <apex:repeat value="{!SortedSettings}" var="s">
+                      <tr class="slds-hint-parent" id="s_{!s.Id}" onclick="updateSelectedSettingAction('{!s.Id}');">
+                          <td class="slds-truncate slds-size_5-of-12" data-label="Name"><apex:outputText value="{!s.Name}"/></td>
+                          <td class="slds-truncate slds-size_2-of-12" data-label="Object Name">{!s.Object__c}</td>
+                          <td class="slds-size_1-of-12" data-label="Created Date"><apex:outputText value="{0, date, MMMM d','  yyyy}"><apex:param value="{!s.createdDate}" /></apex:outputText></td>
+                          <td class="slds-size_2-of-12" data-label="Status">
+                            <center>
+                            <apex:outputPanel id="statusColumn">
+                            <apex:outputPanel rendered="{!IF(s.SH2__Status__c != 'Complete', true, false)}">
+                                <apex:commandLink value="{!IF(s.SH2__Status__c != 'Error', 'Check Run Status', 'Error Encountered')}" action="{!srjInfo.populateRunStatusSetting}" oncomplete="showElement('runStatus')" reRender="runStatusInfo" status="loading">
+                                    <apex:param assignTo="{!srjInfo.selectedSettingId}" value="{!s.Id}" name="targetFieldContext"/>
+                                </apex:commandLink>
+                            </apex:outputPanel>
+                            <apex:outputPanel rendered="{!IF(OR(CONTAINS(s.SH2__Status__c, 'Running'), CONTAINS(s.SH2__Status__c, 'Error'), CONTAINS(s.SH2__Status__c, 'Child Records')), false, true)}">
+                            <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/like_60.png')}" title="Ready"/>
+                            </apex:outputPanel>
+                            </apex:outputPanel>
+                            </center>
+                          </td>
+                          <td class="slds-size_1-of-12"><center>{!s.Deletion_Order__c}</center></td>
+                          <td class="slds-size_1-of-12" data-label="Active"><center><apex:outputPanel rendered="{!s.SH2__Active__c}">
+                          <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/check_60.png')}"></img>
+                          </apex:outputPanel></center></td>
+                      </tr>
+                       
+                      <script>
+                          if('{!s.Id}' == '{!srjInfo.selectedSettingId}'){
+                            document.getElementById('s_' + '{!s.Id}').className += ' slds-is-selected';
+                            document.getElementById('s_' + '{!s.Id}').removeAttribute("onclick");
+                          }
+                      </script>
+                    
+                    </apex:repeat>
+                  </tbody>
+         
+                </table>
+                </apex:outputPanel>
+                <apex:actionPoller reRender="statusColumn" interval="20"/>
+                <apex:outputPanel id="noSettingMessage" rendered="{!IF(srjInfo.numberOfSettings == 0, true, false)}">
+                    <center>
+                    No Storage Recycle Jobs exist. You may create a new setting by clicking the 'New Storage Recycle Job' button.
+                    </center>
+                </apex:outputPanel>
+                </apex:outputPanel>
+              </div>
+            </section>
+          </div>
+
+          <br/><br/><br/><br/>
+          <center>
+          <apex:outputPanel id="dataUsage">
+          <div class="slds-card" style="width:80%">
+            <center>
+            <apex:commandLink value="{!CurrentRunMode}" onclick="changeRunMode();" rerender="none"/>
+            <br/><br/>
+            <div id="storageCalcHelp" style="display:none;max-width:280px;padding-bottom:10px;padding-left:10px;">
+              <div class="slds-popover slds-popover_tooltip slds-nubbin_bottom-right" role="tooltip" aria-live="polite">
+                <div class="slds-popover__body slds-text-longform">
+                  <p>The storage calculation displayed may not be exactly the same as Salesforce's storage usage page. We calculate the storage usage percentage only once an hour.</p>
+                </div>
+              </div>
+              <br/>
+            </div>
+            <c:DSH_DataUsage id="dataUsageComponent"/>
+            </center>
+          </div>
+          </apex:outputPanel>
+          </center>
+          <apex:actionPoller reRender="dataUsageComponent" interval="33"/>
+        </div>
+<!-- / Settings Table -->
+        <div id="rightPanel" class="column region-sidebar slds-small-size_1-of-2 slds-medium-size_2-of-5 slds-large-size_3-of-12" style="background:#f4f6f9;">
+        <apex:outputPanel id="infoPanel">
+        <apex:outputPanel rendered="{!IF(settings.size > 0, true, false)}" styleClass="slds-col slds-p-left_large slds-small-size_1-of-2 slds-medium-size_2-of-5 slds-large-size_3-of-12">
+          <div class="slds-tabs_scoped">
+              <ul class="slds-tabs_scoped__nav" role="tablist">
+                <li id="infoTab" class="slds-tabs_scoped__item slds-text-heading_label slds-active" title="Setting Information" role="presentation"><a class="slds-tabs_scoped__link" role="tab" tabindex="0" aria-selected="true" onclick='showSettingInfo();'>Detail</a></li>
+                <li id="criteriaTab" class="slds-tabs_scoped__item slds-text-heading_label" title="Criterion" role="presentation"><a class="slds-tabs_scoped__link" role="tab" tabindex="-1" aria-selected="false" onclick='showCriterion();'>Filters</a></li>
+                <li id="backupTab" class="slds-tabs_scoped__item slds-text-heading_label" title="Backup" role="presentation"><a class="slds-tabs_scoped__link" role="tab" tabindex="-1" aria-selected="false" onclick='showBackup();'>Backup</a></li>
+              </ul>
+
+<!-- Setting Info -->
+                <div class="slds-card" style="background:White" id="settingInfo">
+         
+                    <section class="slds-card__body">
+                    
+                    <div class="slds-page-header" style="background:White" role="banner">
+                     
+                        <div class="slds-col" style="overflow:hidden">
+                           <h2 class="slds-text-heading_medium slds-truncate">{!srjInfo.selectedSetting.Name}</h2><br/>
+                        </div>
+                        
+                      <div class="slds-grid">
+                     
+                        <div class="slds-col slds-no-flex slds-align-middle">
+                     
+                          <div class="slds-button-group" role="group">
+                          <apex:outputPanel rendered="{!ObjectExists}">
+                            <button type="button" class="slds-button slds-button_neutral" onClick="showElement('editSetting');">
+                              Edit
+                            </button>
+                            <button type="button" class="slds-button slds-button_neutral" onClick="deleteSettingButton();">
+                              Delete
+                            </button>
+                            <button type="button" class="slds-button slds-button_neutral" onClick="previewRecords();">
+                              Preview Records
+                            </button>
+                          </apex:outputPanel>
+                          
+                          <apex:outputPanel rendered="{!!ObjectExists}">
+                            <button type="button" class="slds-button slds-button_neutral" onClick="deleteSettingButton();">
+                              Delete
+                            </button>
+                          </apex:outputPanel>
+                          </div>
+                     
+                        </div>
+                     
+                      </div>
+                     
+                    </div>
+                    
+                      <ul>
+                        <li class="slds-tile slds-hint-parent">
+
+                          <apex:outputPanel id="settingInfoPanel">
+                          <center>
+                            <apex:outputPanel rendered="{!!ObjectExists}">
+                              <div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px">
+                                <center>
+                                The object that this Storage Recycle Job was created for no longer exists.
+                                </center>
+                              </div>
+                            </apex:outputPanel>
+                          <div class="slds-small-size_6-of-7 slds-medium-size_4-of-5 slds-large-size_3-of-5">
+                          <div class="tile__detail" align="left">
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Active:
+                              </dt>
+                              <dd class="slds-dl_horizontal__detail slds-tile__meta">
+                                <p class="slds-truncate"><apex:inputCheckbox value="{!srjInfo.selectedSetting.SH2__Active__c}" disabled="true" title="Click the 'Edit' button to activate."/></p>
+                              </dd>
+                            </dl>
+                            
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Object:
+                              </dt>
+                              <dd class="slds-dl_horizontal__detail slds-tile__meta">
+                                <p class="slds-truncate">{!srjInfo.selectedSetting.SH2__Object__c}</p>
+                              </dd>
+                            </dl>
+                            
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Total Savings:
+                              </dt>
+                              <dd class="slds-dl_horizontal__detail slds-tile__meta">
+                                <p>Yearly Savings: {!currencySymbol}{!totalSRJSavings}
+                                   <br/>
+                                   Records Recycled: {!TotalRecordsRecycled}</p>
+                              </dd>
+                            </dl>
+                            
+                            <apex:outputPanel rendered="{!IF(recentRunDateTime != null, true, false)}">
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Most Recent Run Information:
+                              </dt>
+                              <dd class="slds-dl_horizontal__detail slds-tile__meta">
+                                <p>{!recentRunDateTime}<br/>
+                                   {!NumberOfRecentRecordsRecycled}</p>
+                              </dd>
+                            </dl>
+                            </apex:outputPanel>
+                              
+                            <apex:outputPanel rendered="{!IF(ChildObjectsSelected != null, true, false)}">
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Child Objects Recycled:
+                              </dt>
+                              <dd class="slds-dl_horizontal__detail slds-tile__meta">
+                                <p>{!ChildObjectsSelected}</p>
+                              </dd>
+                            </dl>
+                            </apex:outputPanel>
+
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Hard Delete Records:
+                              </dt>
+                              <dd>
+                                <p class="slds-truncate"><apex:inputCheckbox value="{!srjInfo.selectedSetting.SH2__Hard_Delete__c}" disabled="true" title="Click the 'Edit' button to modify."/></p>
+                              </dd>
+                            </dl>
+
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Created By:
+                              </dt>
+                              <dd class="slds-dl_horizontal__detail slds-tile__meta">
+                                <p>{!srjInfo.selectedSetting.createdBy.Name}</p>
+                              </dd>
+                            </dl>
+
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Last Modified:
+                              </dt>
+                              <dd class="slds-dl_horizontal__detail slds-tile__meta">
+                                <p>{!srjInfo.selectedSetting.lastModifiedBy.Name}</p>
+                                <p>{!lastModifiedDate}</p>
+                              </dd>
+                            </dl>
+                            
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Notes:
+                              </dt>
+                              <dd>
+                                <div class="slds-scrollable_y" style="height:90px;">{!srjInfo.selectedSetting.SH2__Notes__c}</div>
+                              </dd>
+                            </dl>
+                          </div>  
+                          </div>
+                          </center>
+                          </apex:outputPanel>
+                          <br/>
+                        </li>
+                      </ul>
+                    </section>
+                 
+                  </div>
+<!-- / Setting Info -->               
+                  
+<!-- Criterion -->
+                <div class="slds-card" style="background:White; margin-top: 0px; display:none" id="criterion">
+             
+                        <section class="slds-card__body">
+                        <apex:outputPanel id="criteriaPanel">
+                        <div class="slds-page-header" style="background:White" role="banner">
+
+                        <div class="slds-col" style="overflow:hidden">
+                           <h2 class="slds-text-heading_medium slds-truncate">{!srjInfo.selectedSetting.Name}</h2><br/>
+                        </div>
+                        
+                        <div class="slds-grid">
+                        
+                        <div class="slds-col slds-no-flex slds-align-middle">
+                         
+                              <div class="slds-button-group" role="group">
+                                <apex:outputPanel rendered="{!ObjectExists}">
+                                  <button type="button" class="slds-button slds-button_neutral" onclick="addAdditionalCriteria();">
+                                    Add Filter
+                                  </button>
+                                  <apex:outputPanel id="changeLogicButton" rendered="{!IF(filterInfo.selectedCriteria.size > 1, true, false)}">
+                                  <div class="slds-dropdown-trigger">
+                                    <button type="button" class="slds-button slds-button_icon-border-filled" aria-haspopup="true">                     
+                                      <apex:image url="{! URLFOR($Asset.SLDS, 'assets/icons/utility/down_60.png')}" height="60%" width="60%"/>
+                                    </button>
+                                      <div class="slds-dropdown slds-dropdown_right slds-dropdown_menu">
+                                        <ul class="slds-dropdown__list" role="menu">
+                                          <li class="slds-dropdown__item">
+                                            <a href="javascript:void(0)" role="menuitem" onClick="updateFilterLogic();">
+                                             Change Filter Logic
+                                            </a>
+                                          </li>
+                                        </ul>
+                                      </div>
+                                  </div>
+                                  </apex:outputPanel>
+                                </apex:outputPanel>
+                              </div>
+                         
+                            </div>
+                         
+                          </div>
+                          </div>
+                        
+                          <apex:outputPanel rendered="{!!ObjectExists}">
+                            <div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px">
+                              <center>
+                              The object that this Storage Recycle Job was created for no longer exists.
+                              </center>
+                            </div>
+                          </apex:outputPanel>
+                        
+                          <ul>
+                            <li class="slds-tile slds-hint-parent">
+                              <center>
+                              <div>
+                              <apex:outputPanel id="allCriterion" rendered="{! IF(filterInfo.selectedCriteria.size > 0, true, false)}">
+                              <div style="overflow: auto; max-height:400px">
+                              <apex:pageBlock >
+                              <apex:pageBlockTable value="{!filterInfo.selectedCriteria}" styleClass="slds-table slds-table_bordered" var="c">
+                              <apex:column styleClass="slds-size_5-of-7">
+                              <b>Order:&nbsp;</b><apex:outputText value="{!c.id + 1}"/>
+                              <span style="float:right">
+                                <a href="javascript:void(0)" role="menuitem" onclick="editCriterion('{!c.Id}')">
+                                  Edit
+                                </a>
+                                |
+                                <a href="javascript:void(0)" role="menuitem" onclick="deleteSelectedCriterion('{!c.Id}')">
+                                  Delete
+                                </a>
+                              </span><br/>
+                              
+                              <p Class="slds-truncate" title="{!c.Field}"><b>Field:&nbsp;</b>{!c.Field}</p>
+                              <b>Operator:&nbsp;</b> <apex:outputText value="{!c.logic}"/> <br/>
+                              <p Class="slds-truncate" title="{!c.condition}"><b>Value:&nbsp;</b>{!c.condition}</p>
+                              </apex:column>
+                            
+                              </apex:pageBlockTable>
+                              </apex:pageBlock>
+                              </div>
+                              
+                              <br/>
+                              <apex:outputPanel id="filterLogic" rendered="{! IF(filterInfo.selectedCriteria.size > 1, true, false)}">
+                              <apex:outputText value="{!invalidMessage}" style="color:red;" rendered="{!filterInfo.showInvalidBoolString}" id="boolStringError" /><br/>
+                              <b>Filter Logic:</b> 
+                              <span>
+                                <apex:inputText value="{!srjInfo.selectedSetting.SH2__Filter_Logic__c}" disabled="{!NOT(editLogicContext)}"/><br/>
+                              </span>
+                              <apex:commandButton value="Update" action="{!updateFilterLogic}" rendered="{!editLogicContext}" reRender="filterLogic, filterString" status="loading"/>
+                              </apex:outputPanel>
+                              <br/><br/>
+                              <div>
+                              <b>Filter String:</b>
+                              <br/>
+                              <div style="max-height:200px; overflow: scroll;"><apex:outputText id="filterString" value="{!filterLogic}" rendered="{!NOT(filterLogic == null)}"/></div>
+                              </div>
+                              </apex:outputPanel>
+                              </div>
+                              </center>
+                            </li>
+                          </ul>
+                        </apex:outputPanel>
+                        </section>
+                     
+                      </div>
+<!-- / Criterion -->
+
+<!-- Backup Info -->
+              <div class="slds-card" style="background:White; margin-top: 0px; display:none" id="backupSettings">
+             
+                    <section class="slds-card__body">
+                    <apex:outputPanel id="backupPanel">
+                    <div class="slds-page-header" style="background:White" role="banner">
+      
+                    <div class="slds-col" style="overflow:hidden">
+                       <h2 class="slds-text-heading_medium slds-truncate">{!srjInfo.selectedSetting.Name}</h2><br/>
+                    </div>
+                    
+                      <div class="slds-grid">
+                      
+                        <div class="slds-col slds-no-flex slds-align-middle">
+                         
+                          <div class="slds-button-group" role="group">
+                            <apex:outputPanel >
+                              <apex:commandButton value="Backup Settings" action="{!backupInfo.editBackupConfig}" styleClass="slds-button slds-button_neutral" rerender="fieldBackupSelect, srjConfigButtons" status="loading" onComplete="showElement('backupConfig');"/>
+                              <apex:commandButton value="View Backup Files" action="{!buildBackupPaginationController}" styleClass="slds-button slds-button_neutral" status="loading" rerender="backupDownloadConfig" onComplete="showBackupDownload();"/>
+                            </apex:outputPanel>
+                          </div>
+                          
+                        </div>
+                       
+                      </div>
+                    </div>
+                    
+                    <ul>
+                        <li class="slds-tile slds-hint-parent">
+
+                          <apex:outputPanel id="backupInfoPanel">
+                          <center>
+                          <div class="slds-small-size_6-of-7 slds-medium-size_4-of-5 slds-large-size_3-of-5">
+                          <div class="tile__detail" align="left">
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Backup Mode:
+                              </dt>
+                              <dd class="slds-dl_horizontal__detail slds-tile__meta">
+                                {!srjInfo.selectedSetting.SH2__Backup_Mode__c}
+                              </dd>
+                            </dl>
+                            
+                            <apex:outputPanel rendered="{!srjInfo.selectedSetting.SH2__Backup_Mode__c == 'Select Fields To Backup'}">
+                            <dl class="dl_horizontal slds-text-body_small slds-has-divider_top-space">
+                              <dt>
+                                Fields To Backup:
+                              </dt>
+                              <dd>
+                                <apex:outputText escape="false" value="{!AllFieldsToBackup}"/>
+                              </dd>
+                            </dl>
+                            </apex:outputPanel>
+                            
+                          </div>  
+                          </div>
+                          </center>
+                          </apex:outputPanel>
+                        </li>   
+                    </ul>
+                    
+                    </apex:outputPanel>
+                    </section>
+              </div>
+<!-- / Backup Info -->
+              
+          </div>
+        </apex:outputPanel>
+        </apex:outputPanel>  
+        </div>
+
+        </div>
+        
+<!-- Record Preview -->     
+        <div id="recordPreview" style="display:none;">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="min-width:450px max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Recyclable Records</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="clearPreviewCount();hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <div class="slds-modal__content slds-p-around_small">
+                <apex:outputPanel id="preview">
+                  <apex:outputPanel rendered="{!DeletionErrorMessage != null}" style="color:red"><apex:outputText value="{!DeletionErrorMessage}" style="color:red;"/></apex:outputPanel>
+                  <c:DSH_RecordPreview setting="{!srjInfo.selectedSetting}" hasOwnerFld="{!hasOwnerField}" pageController="{!previewController}" rendered="{!renderRecordPreview}"/>
+                </apex:outputPanel>
+              </div>
+            </div>
+          </div>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+        </div>
+<!-- / Record Preview -->
+        
+<!-- Setting Config -->
+        <div id="settingConfig" style="display:none;">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Storage Helper Settings</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="updateStep('step2', '{!TutorialStep}', false);hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <div class="slds-modal__content slds-p-around_small">
+                    Maximum Number of Records to Recycle: 
+                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#limitInfo').toggle();" onmouseout="dsh.j$('#limitInfo').toggle();"/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="limitInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none">
+                              <div class="slds-popover__body">This is the maximum number of records Storage Helper will recycle in a single run context. If you wish to remove the limit, you may clear out the value in this field.
+                              </div>
+                            </div>
+                        </div>
+                    <apex:inputField id="maxRecordsToDelete" styleClass="slds-input" value="{!settingConfig.SH2__Max_Records_To_Delete__c}"/>
+                    <div id="maxRecordsError" style="display:none;">
+                    <font style="color:red">
+                        <apex:outputPanel rendered="{!IsPayingCustomer}">The max value for this field is 50,000.</apex:outputPanel>
+                        <apex:outputPanel rendered="{!!IsPayingCustomer}">The free version of Storage Helper allows a maximum 20,000 records to be deleted each month.</apex:outputPanel>
+                    </font></div><br/>
+                    Alert Threshold (in Percent): 
+                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#thresholdInfo').toggle();" onmouseout="dsh.j$('#thresholdInfo').toggle();"/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="thresholdInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none">
+                              <div class="slds-popover__body">A storage usage alert will be sent when the usage reaches this percentage.
+                              </div>
+                            </div>
+                        </div>
+                    <apex:inputText styleClass="slds-input" value="{!settingConfig.SH2__Alert_Threshold__c}"/><br/>
+                    Notification Email Address(es):
+                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#emailInfo').toggle();" onmouseout="dsh.j$('#emailInfo').toggle();"/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="emailInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none">
+                              <div class="slds-popover__body">Email addresses that will be sent usage alerts. Multiple email addresses may be seperated by a comma EX: test@email.com,email@test.com.
+                              </div>
+                            </div>
+                        </div>
+                    <apex:inputText styleClass="slds-input" id="emailAddress" value="{!settingConfig.SH2__Alert_Emails__c}"/>
+                    <div id="emailError" style="display:none;"><font style="color:red">This is not a valid email address.</font></div><br/>
+                    Force Record Preview for New Storage Recycle Jobs:
+                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#previewInfo').toggle();" onmouseout="dsh.j$('#previewInfo').toggle();"/><br/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="previewInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none">
+                              <div class="slds-popover__body">With this setting enabled, a preview of records that a new Storage Recycle Job will delete will be displayed before activation. This will help ensure that the filters defined are correct before the Storage Recycle Job is activated.
+                              </div>
+                            </div>
+                        </div>
+                    <apex:inputCheckbox style="height:17px;width:17px;" value="{!settingConfig.SH2__Force_Preview__c}"/><br/>
+                    Salesforce Data Storage is Purchased at a Discount:
+                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#discountInfo').toggle();" onmouseout="dsh.j$('#discountInfo').toggle();"/><br/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="discountInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none">
+                              <div class="slds-popover__body">If your organization purchases data storage at a discount this box should be checked.
+                              </div>
+                            </div>
+                        </div>
+                    <apex:inputCheckbox style="height:17px;width:17px;" value="{!storageDiscount}"><apex:actionSupport event="onchange" rerender="discountInput" status="loading"/></apex:inputCheckbox><br/>
+                    <apex:outputPanel id="discountInput">
+                      <apex:outputPanel rendered="{!storageDiscount}">
+                      Salesforce Data Storage Cost (Per 500MB/year):<apex:inputField styleClass="slds-input" value="{!settingConfig.SH2__Data_Storage_Cost__c}"/><br/>
+                      </apex:outputPanel>
+                    </apex:outputPanel>
+                    Auto Delete Old Storage Helper Backups:
+                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#autoCleanupInfo').toggle();" onmouseout="dsh.j$('#autoCleanupInfo').toggle();"/><br/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="autoCleanupInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none">
+                              <div class="slds-popover__body">With this setting checked you may specify how long to keep the backups that Storage Helper generates.
+                              </div>
+                            </div>
+                        </div>
+                    <apex:inputCheckbox value="{!backupInfo.autoDeleteBackups}" style="height:17px;width:17px;">
+                    <apex:actionSupport event="onchange" reRender="backupLength" status="loading"/>
+                    </apex:inputCheckbox><br/>
+                    <apex:outputPanel id="backupLength">
+                        <apex:outputPanel rendered="{!backupInfo.autoDeleteBackups}">
+                            Number of Months to Keep Backups:<br/>
+                            <apex:inputText styleClass="slds-input" value="{!settingConfig.SH2__Months_To_Keep_Backups__c}"/>
+                            <br/>
+                        </apex:outputPanel>
+                    </apex:outputPanel> 
+                    Track Monthly Data and File Storage:
+                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#trackTotalsInfo').toggle();" onmouseout="dsh.j$('#trackTotalsInfo').toggle();"/><br/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="trackTotalsInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none">
+                              <div class="slds-popover__body">With this setting checked two Storage Usage Tracking records will be created each month to track storage usage.
+                              </div>
+                            </div>
+                        </div>
+                    <apex:inputCheckbox style="height:17px;width:17px;" value="{!settingConfig.SH2__Track_Storage_Usage__c}"/>
+                    <br/>
+                    Track Monthly Object Storage Usage:
+                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#trackObjectInfo').toggle();" onmouseout="dsh.j$('#trackObjectInfo').toggle();"/><br/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="trackObjectInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none">
+                              <div class="slds-popover__body">With this setting checked a Storage Usage Tracking record will be created each month for every object in your environment. Please Note: this will consume data storage.
+                              </div>
+                            </div>
+                        </div>
+                    <apex:inputCheckbox style="height:17px;width:17px;" value="{!settingConfig.SH2__Track_Object_Usage__c}"/>
+                    <br/>
+                    <br/>
+                    <center>
+                    <apex:outputText value="{!CurrentRunMode}" id="currentRunMode"/><br/>
+                    <button type="button" class="slds-button slds-button_neutral" onclick="changeRunMode();updateStep('step1.2', '{!TutorialStep}', false);">Change Run Mode</button>
+                    </center>
+              </div>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                  <button type="button" class="slds-button slds-button_neutral" onClick="updateStep('step2', '{!TutorialStep}', false);hideAllModals();">Cancel</button>
+                  <button type="button" class="slds-button slds-button_neutral" onclick="updateStep('step2', '{!TutorialStep}', false);saveSettingConfig();">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="slds-backdrop slds-backdrop_open"></div>
+        </div>
+<!-- / Setting Config -->       
+        
+<!-- New Setting -->
+        <div id="newSetting" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-width:800px; max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">New Storage Recycle Job</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <div class="slds-modal__content slds-p-around_small">
+              <apex:outputPanel id="newSettingFields">
+                <apex:outputPanel id="notUndeletable">
+                  <apex:outputPanel rendered="{!!IsUndeletable}">
+                  <div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px" role="alert">
+                    <b>Please Note: The records for this object type will not be sent to the recycling bin when this Storage Recycle Job is run. Please ensure backups are in place for this object type.</b>
+                  </div>
+                  </apex:outputPanel>
+                </apex:outputPanel>
+                <div class="slds-grid">
+                    <div class="slds-size_1-of-1">
+                        Name:
+                        <br/>
+                            <apex:inputText styleClass="slds-input" id="settingName" maxlength="80" value="{!srjInfo.newSetting.Name}"/>
+                            <div id="newSettingNameError" style="display:none;"><font style="color:red">A Storage Recycle Job already exists with this name.</font></div>
+                    </div>
+                </div>
+                <div class="slds-grid">
+                  <div class="slds-size_1-of-1">
+                   <apex:outputPanel id="newObjects">
+                      <p style="float:left;">Object:</p> 
+                      <p style="float:right;"><c:Paginate pageController="{!newObjectsController}" renderedComponent="newObjects" statusDisplay="loading"/></p>
+                      <div id="step3">
+                      <apex:selectList styleClass="slds-select .is-required" id="objectList" size="4" value="{!srjInfo.newSetting.SH2__Object__c}">
+                      <apex:actionSupport event="onchange" rerender="dependentChildrenTableNew, notUndeletable" status="loading" oncomplete="updateStep('step4', '{!TutorialStep}', false);"/>  
+                      <apex:selectOptions value="{!newPaginatedObjectList}"/></apex:selectList>
+                      </div>
+                   </apex:outputPanel> 
+                   <div id="NewSettingObjectError" style="display:none;"><font style="color:red">This is a required Field.</font></div>       
+                  </div>
+                </div>
+                <div class="slds-grid">
+                    <div class="slds-size_1-of-3">
+                        Deletion Order:
+                        <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#deletionOrderInfo').toggle();" onmouseout="dsh.j$('#deletionOrderInfo').toggle();"/><br/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="deletionOrderInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none;">
+                              <div class="slds-popover__body">If your organization needs certain Storage Recycle Jobs to be run before others, you may populate a value in this section.
+                              </div>
+                            </div>
+                            <div id="hardDeleteInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none;width:450px;max-width:450px;">
+                              <div class="slds-popover__body">With this setting checked, records will NOT be sent to the recycling bin. It is best to leave this option NOT checked for an added level of safety. However if the records deleted by this Storage Recycle Job do not matter as much as other records in your recycling bin you may select this option.
+                              </div>
+                            </div>
+                        </div>
+                        <apex:inputField styleClass="slds-input" value="{!srjInfo.newSetting.SH2__Deletion_Order__c}"/>
+                    </div>
+                </div>
+                <div class="slds-grid">
+                    <div class="slds-size_1-of-1">
+                        Notes:
+                        <br/>
+                            <apex:inputTextArea styleClass="slds-textarea" id="settingNotes" value="{!srjInfo.newSetting.SH2__Notes__c}"/>
+                    </div>
+                </div>
+                <div class="slds-grid">
+                    <div class="slds-size_1-of-1">
+                        Hard Delete Records:
+                        <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#hardDeleteInfo').toggle();" onmouseout="dsh.j$('#hardDeleteInfo').toggle();"/><br/>
+                        <apex:inputCheckbox value="{!srjInfo.newSetting.SH2__Hard_Delete__c}" style="height:17px;width:17px;"/>
+                    </div>    
+                </div>
+                <apex:outputPanel id="dependentChildrenTableNew">
+                <apex:outputPanel rendered="{!ListOfChildObjectForNewSRJ.size > 0}">
+                    <br/>
+                    <div class="slds-notify_container" style="position:relative;">
+                      <div class="slds-notify slds-notify_alert slds-theme_alert-texture" role="alert">
+                        <div class="slds-text-longform">
+                        <span class="slds-assistive-text">Required Cascade Deletion Objects</span>
+                        <b>
+                        <h2>Below is a list of child objects that could block {!srjInfo.newSetting.SH2__Object__c} records from being recycled.<br/>
+                        Select the child object type(s) you would like to recycle with their parents.</h2>
+                        </b>
+                        <div align="left">
+                        <ul>
+                          <li>If no child object types are checked, only {!srjInfo.newSetting.SH2__Object__c} records that do not have child records that belong to the object type(s) listed below will be recycled.</li>
+                          <li>Child records of the object type(s) listed below cannot be restored from the recycling bin. Please ensure backups are in place for these objects.</li>
+                        </ul>
+                        </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="slds-scrollable_x">
+                    <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width:30px;">
+                          <div class="slds-truncate" title="Cascade Delete">Cascade Delete</div>
+                        </th>
+                        <th scope="col">
+                          <div class="slds-truncate" title="Child Object Type">Child Object Type</div>
+                        </th>
+                        <th scope="col">
+                          <div class="slds-truncate" title="Lookup Field">Lookup Field</div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                     
+                    <apex:repeat value="{!ListOfChildObjectForNewSRJ}" var="obj">
+                      <tr>
+                        <th scope="row" data-label="Cascade Delete" style="width:30px;">
+                          <center>
+                          <apex:inputCheckbox value="{!obj.selected}" onclick="updateListOfChildRecordsToDelete('new', '{!obj.identifier}');"/>
+                          </center>
+                        </th>
+                        <th scope="row" data-label="Child Object Type">
+                          {!obj.objLabel}
+                        </th>
+                        <th scope="row" data-label="Lookup Field">
+                          {!obj.lookupField}
+                        </th>
+                      </tr>
+                    </apex:repeat>
+                 
+                    </tbody>
+                    </table>
+                    </div>
+                </apex:outputPanel>
+                </apex:outputPanel>
+               </apex:outputPanel>
+                
+              </div>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                <apex:outputPanel id="newSrjButtons">
+                  <button type="button" class="slds-button slds-button_neutral" onClick="hideAllModals();">Cancel</button>
+                  <apex:commandButton id="step4" value="Next" styleclass="slds-button slds-button_neutral" onclick="newSettingFilter();" reRender="none"/>
+                </apex:outputPanel>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="slds-backdrop slds-backdrop_open"></div>
+        </div>
+<!-- / New Setting -->
+        
+<!-- Edit Setting -->
+        <div id="editSetting" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-width:800px; max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Edit Storage Recycle Job</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <div class="slds-modal__content slds-p-around_small">
+              <apex:outputPanel id="editSettingFields">
+                <apex:outputPanel id="activeWarning2">
+                <apex:outputPanel rendered="{!srjInfo.selectedSetting.SH2__Active__c}">
+                  <apex:outputPanel rendered="{!IF(filterInfo.selectedCriteria.size > 0, true, false)}">
+                      <div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px" role="alert">
+                        <b>Please Note: To prevent important data from being deleted accidentally, we recommend keeping the Storage Recycle Job inactive until the deletion filters are fully defined.</b>
+                      </div>
+                    </apex:outputPanel>
+                    <apex:outputPanel rendered="{!IF(filterInfo.selectedCriteria.size == 0, true, false)}">
+                        <div class="slds-notify slds-notify_toast slds-theme_error" style="min-width:0px" role="alert">
+                            <b>WARNING: No filter criteria have been defined for this Storage Recycle Job.  It is highly recommended that filter criteria be defined before activating a Storage Recycle Job unless you plan to delete all records.</b>
+                        </div>
+                    </apex:outputPanel>
+                </apex:outputPanel>
+                </apex:outputPanel>
+                <div class="slds-grid">
+                    <div class="slds-size_1-of-1">
+                        Name:
+                        <br/>
+                            <apex:inputText styleClass="slds-input" maxlength="80" value="{!srjInfo.selectedSetting.Name}"/>
+                            <div id="editSettingNameError" style="display:none;"><font style="color:red">A Storage Recycle Job already exists with this name.</font></div>
+                    </div>
+                </div>
+                <div class="slds-grid">
+                    <div class="slds-size_1-of-1">        
+                      <apex:outputPanel id="editObjects">
+                        <p style="float:left;">Object:</p> 
+                        <p style="float:right;"><c:Paginate pageController="{!editObjectsController}" renderedComponent="editObjects" statusDisplay="loading"/></p>
+                        <apex:selectList styleClass="slds-select .is-required" id="editObjectList" size="4" value="{!srjInfo.selectedSetting.SH2__Object__c}">
+                          <apex:actionSupport event="onchange" rerender="dependentChildrenTableEdit" status="loading"/>  
+                        <apex:selectOptions value="{!editPaginatedObjectList}"/></apex:selectList>
+                      </apex:outputPanel>
+                      <div id="EditSettingObjectError" style="display:none;"><font style="color:red">This is a required Field.</font></div>
+                    </div>
+                </div>
+                <div class="slds-grid">
+                    <div class="slds-size_1-of-1">
+                        Notes:
+                        <br/>
+                            <apex:inputTextArea styleClass="slds-textarea" value="{!srjInfo.selectedSetting.SH2__Notes__c}"/>
+                    </div>
+                </div>
+                <div class="slds-grid">
+                    <div class="slds-size_1-of-1">
+                        Hard Delete Records:
+                        <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#hardDeleteEditInfo').toggle();" onmouseout="dsh.j$('#hardDeleteEditInfo').toggle();"/><br/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="hardDeleteEditInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none;max-width:500px;">
+                              <div class="slds-popover__body">With this setting checked, records will NOT be sent to the recycling bin. It is best to leave this option NOT checked for an added level of safety. However if the records deleted by this Storage Recycle Job do not matter as much as other records in your recycling bin you may select this option.
+                              </div>
+                            </div>
+                        </div>
+                        <apex:inputCheckbox style="height:17px;width:17px;" value="{!srjInfo.selectedSetting.SH2__Hard_Delete__c}"/>
+                    </div>    
+                </div>
+                <div class="slds-grid">
+                    <div class="slds-size_1-of-3">
+                        Deletion Order:
+                        <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#deletionOrderInfo2').toggle();" onmouseout="dsh.j$('#deletionOrderInfo2').toggle();"/><br/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="deletionOrderInfo2" class="slds-popover slds-theme_info" role="dialog" style="display:none;max-width: 500px;width:300px;">
+                              <div class="slds-popover__body">If your organization needs certain Storage Recycle Jobs to be run before others, you may populate a value in this section.
+                              </div>
+                            </div>
+                        </div>
+                        <apex:inputField styleClass="slds-input" value="{!srjInfo.selectedSetting.SH2__Deletion_Order__c}"/>
+                    </div>
+                </div>
+                <div class="slds-grid">
+                    <div class="slds-size_1-of-1">
+                        Active:
+                        <br/>
+                            <apex:inputCheckbox style="height:17px;width:17px;" value="{!srjInfo.selectedSetting.SH2__Active__c}">
+                              <apex:actionSupport event="onchange" rerender="activeWarning2" status="loading"/>
+                            </apex:inputCheckbox>
+                    </div>
+                </div>
+                
+                
+                <apex:outputPanel id="dependentChildrenTableEdit">
+                <apex:outputPanel rendered="{!ListOfChildObjectForEditSRJ.size > 0}">
+                    <br/>
+                    <div class="slds-notify_container" style="position:relative;">
+                      <div class="slds-notify slds-notify_alert slds-theme_alert-texture" role="alert">
+                        <div class="slds-text-longform">
+                        <span class="slds-assistive-text">Required Cascade Deletion Objects</span>
+                        <b>
+                        <h2>Below is a list of child objects that could block {!srjInfo.selectedSetting.SH2__Object__c} records from being recycled.<br/>
+                        Select the child object type(s) you would like to recycle with their parents.</h2>
+                        </b>
+                        <div align="left">
+                        <ul>
+                          <li>If no child object types are checked, only {!srjInfo.selectedSetting.SH2__Object__c} records that do not have child records that belong to the object type(s) listed below will be recycled.</li>
+                          <li>Child records of the object type(s) listed below cannot be restored from the recycling bin. Please ensure backups are in place for these objects.</li>
+                        </ul>
+                        </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="slds-scrollable_x">
+                    <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width:30px;">
+                          <div class="slds-truncate" title="Cascade Delete">Cascade Delete</div>
+                        </th>
+                        <th scope="col">
+                          <div class="slds-truncate" title="Child Object Type">Child Object Type</div>
+                        </th>
+                        <th scope="col">
+                          <div class="slds-truncate" title="Lookup Field">Lookup Field</div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                     
+                    <apex:repeat value="{!ListOfChildObjectForEditSRJ}" var="obj">
+                      <tr>
+                        <th scope="row" data-label="Cascade Delete" style="width:30px;">
+                          <center>
+                          <apex:inputCheckbox value="{!obj.selected}" onclick="updateListOfChildRecordsToDelete('edit', '{!obj.identifier}');"/>
+                          </center>
+                        </th>
+                        <th scope="row" data-label="Child Object Type">
+                          {!obj.objLabel}
+                        </th>
+                        <th scope="row" data-label="Lookup Field">
+                          {!obj.lookupField}
+                        </th>
+                      </tr>
+                    </apex:repeat>
+                 
+                    </tbody>
+                    </table>
+                    </div>
+                </apex:outputPanel>
+                </apex:outputPanel>
+                
+                
+               </apex:outputPanel>
+                
+              </div>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                  <button type="button" class="slds-button slds-button_neutral" onClick="showCriterion();">Edit Filters</button>
+                  <button type="button" class="slds-button slds-button_neutral" onClick="hideAllModals();">Cancel</button>
+                  <button type="button" onclick ="updateSetting();" class="slds-button slds-button_neutral">Update</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="slds-backdrop slds-backdrop_open"></div>
+        </div>
+<!-- / Edit Setting -->
+        
+<!-- New Filter Criteria -->
+        <div id="newCriterion" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Create Filter</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <apex:outputPanel id="criterionModal">
+              <div class="slds-modal__content slds-p-around_small">
+                <div class="slds-grid slds-wrap">
+                      <div id="newFieldSelection" class="slds-size_1-of-1">
+                        <apex:outputPanel id="newFields">
+                            <p style="float:left;">Field:</p> 
+                            <p style="float:right;"><c:Paginate pageController="{!fieldsController}" renderedComponent="newFields" statusDisplay="loading"/></p>
+                            <div id="step5">
+                            <apex:selectList styleClass="slds-select" value="{!filterInfo.newCriterion.Field}" id="objFields" size="4"> 
+                            <apex:actionSupport event="onchange" action="{!clearFilterOperator}" rerender="newCritOper, newCritVal, fkObjFields1, newCriteriaInformation" oncomplete="setFildSelectListSize('new', {!parentFieldListForNewCriterion.size});updateStep('step6', '{!TutorialStep}', false);" status="loading">
+                              <apex:param assignTo="{!context}" value="target" name="targetFieldContext"/>
+                            </apex:actionSupport>
+                            <apex:selectOptions value="{!FieldList}"/> 
+                            </apex:selectList>
+                            </div>
+                        </apex:outputPanel>
+                      </div>
+                      <div id="newFKSelection" class="slds-size_1-of-2">
+                        <apex:outputPanel id="fkObjFields1">
+                          <apex:outputPanel rendered="{!ParentFieldListForNewCriterion.size > 0}">
+                            <p style="float:left;">&nbsp;</p>
+                            <p style="float:right;"><c:Paginate pageController="{!parentFieldsController}" renderedComponent="fkObjFields1, newCritOper, msgs" statusDisplay="loading"/></p>
+                            <apex:selectList styleClass="slds-select" value="{!filterInfo.parentField}" size="4"> 
+                            <apex:actionSupport event="onchange" action="{!clearFilterOperator}" rerender="newCritOper, newCritVal, newCriteriaInformation, msgs" status="loading">
+                              <apex:param assignTo="{!context}" value="parent" name="parentFieldContext"/>
+                            </apex:actionSupport>
+                            <apex:selectOptions value="{!ParentFieldListForNewCriterion}"/> 
+                            </apex:selectList>
+                          </apex:outputPanel>
+                        </apex:outputPanel>
+                      </div>
+                      <div class="slds-size_1-of-1">
+                            <div id="NewCriteriaFieldError" style="display:none;"><font style="color:red">This is a required Field.</font></div>
+                            <br/>
+                            <apex:outputPanel id="newCritOper">
+                            <apex:outputPanel rendered="{!OR(AND(filterInfo.newCriterion.Field != '', ParentFieldListForNewCriterion.size > 0, filterInfo.parentField != null), AND(filterInfo.newCriterion.Field != '', ParentFieldListForNewCriterion.size == 0))}">
+                            Logic:
+                            <br/>
+                                <div id="step6">
+                                <apex:selectList id="NewCriteriaOper" styleClass="slds-select" value="{!filterInfo.newCriterion.logic}" size="1">
+                                <apex:actionSupport event="onchange" action="{!updateCriteriaInformationText}" rerender="newCritVal, fkObjFields1, newCriteriaInformation, msgs" oncomplete="updateStep('step7', '{!TutorialStep}', false);" status="loading"/>
+                                <apex:selectOptions value="{!FilterOperators}"/>
+                                </apex:selectList>
+                                </div>
+                                <div id="NewCriteriaOperError" style="display:none;"><font style="color:red">This is a required Field.</font></div>
+                            </apex:outputPanel>    
+                            </apex:outputPanel>    
+                            <br/>
+                            <apex:outputPanel id="newCritVal">
+                            <apex:outputPanel rendered="{!IF(filterInfo.newCriterion.logic != '', true, false)}">
+                            Condition:
+                            <br/>
+                                <div id="step7">
+                                    <apex:outputPanel layout="block" id="filterDataEntry1" rendered="{!NOT(filterInfo.hasCriteriaPicklist)}"> 
+                                        <apex:inputText styleClass="slds-input" value="{! filterInfo.filterCondition }"/>
+                                    </apex:outputPanel><div id="newConditionError" style="display:none"></div>
+                                    
+                                    <apex:outputPanel layout="block" id="filterPicklist1" rendered="{!filterInfo.hasCriteriaPicklist}"> 
+                                        <apex:selectList size="1" styleClass="slds-select" value="{! filterInfo.filterCondition }" rendered="{!NOT(filterInfo.allowMultiselect)}">
+                                            <apex:actionSupport event="onchange" action="{!updateCriteriaInformationText}" rerender="filterCriteriaVar1, setDateVar1, newCriterionButtons, newCriteriaInformation" oncomplete="updateStep('step8', '{!TutorialStep}', false);" status="loading"/>
+                                            <apex:selectOptions value="{! filterCriteriaOptions }"/> 
+                                        </apex:selectList>
+                                        <apex:outputPanel id="newCriteriaInformation">
+                                            <apex:outputPanel rendered="{!filterInfo.newCriterionInfo != null}">
+                                                <div class="slds-notify_container" style="position:relative;">
+                                                    <div class="slds-notify slds-notify_toast slds-theme_warning" role="alert">
+                                                        <b>{!filterInfo.newCriterionInfo}</b>
+                                                    </div>
+                                                </div>
+                                            </apex:outputPanel>
+                                        </apex:outputPanel>
+                                        <apex:selectList size="3" multiselect="true" styleClass="slds-select" value="{! filterInfo.filterConditions }" rendered="{!filterInfo.allowMultiselect}">
+                                            <apex:actionSupport event="onchange" action="{!filterInfo.buildCriterionStringFromMultiselect}" rerender="filterCriteriaVar1, setDateVar1, newCriterionButtons" oncomplete="updateStep('step8', '{!TutorialStep}', false);" status="loading"/>
+                                            <apex:selectOptions value="{! filterCriteriaOptions }"/> 
+                                        </apex:selectList>
+                                        
+                                        <apex:outputPanel id="filterCriteriaVar1" >
+                                            <apex:outputPanel rendered="{!filterInfo.hasFilterCriteriaVariable}">
+                                                <br/>
+                                                <apex:outputText value="Number"/>
+                                                <br/>                       
+                                                <apex:inputText id="newFilterCon" styleClass="slds-input" value="{! filterInfo.filterConditionVar }">
+                                                <apex:actionSupport event="onchange" oncomplete="updateStep('step8', '{!TutorialStep}', false);"/>
+                                                </apex:inputText>
+                                                <div id="newCriteriaVariableError" style="display:none;"><font style='color:red'>You must input a number before saving.</font></div>
+                                            </apex:outputPanel>
+                                        </apex:outputPanel> 
+                                        
+                                        <apex:outputPanel id="setDateVar1" >  
+                                            <apex:outputPanel rendered="{!filterInfo.hasDateSelect}" id="panelForSelectDate1">
+                                                <br/> 
+                                                <apex:outputText value="Date" rendered="{!filterInfo.hasDateSelect}"/>
+                                                <br/>
+                                                <script>
+                                                    //Verify namespace is ready
+                                                    var dsh = dsh || {};
+                                                    dsh.j$ = jQuery.noConflict();    
+                                                    
+                                                    dsh.j$(function() {
+                                                       dsh.j$( '[id$=datetimepicker1]' ).datetimepicker();
+                                                       dsh.j$( '[id$=datepicker1]' ).datepicker();
+                                                    });
+                                                </script>
+                                                <apex:inputText styleClass="slds-input" id="datepicker1" value="{!filterInfo.datePicker}" rendered="{!filterInfo.hasSelectDateVariable}">
+                                                <apex:actionSupport event="onchange" oncomplete="updateStep('step8', '{!TutorialStep}', false);" rerender="none"/>
+                                                </apex:inputText>
+                                                <apex:inputText styleClass="slds-input" id="datetimepicker1" value="{!filterInfo.dateTimePicker}" rendered="{!filterInfo.hasSelectDateTimeVariable}">
+                                                <apex:actionSupport event="onchange" oncomplete="updateStep('step8', '{!TutorialStep}', false);" rerender="none"/>
+                                                </apex:inputText>
+                                                <br/>
+                                                <apex:outputText value="(ex: 01/11/2011 01:00)" rendered="{!filterInfo.hasSelectDateTimeVariable}"/>        
+                                            </apex:outputPanel>
+                                        </apex:outputPanel>
+                                    </apex:outputPanel>
+                                </div>
+                            </apex:outputPanel>     
+                            </apex:outputPanel> 
+                    </div>
+                  </div>
+
+              </div>
+              
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                  <apex:outputPanel id="newCriterionButtons">
+                  <button type="button" class="slds-button slds-button_neutral" onClick="hideAllModals();">Cancel</button>
+                  <div id="step8" style="display:inline-block;">
+                  <apex:commandButton value="Add Additional Filter" styleclass="slds-button slds-button_neutral" onclick="addAdditionalCriterion();" oncomplete="updateStep('step5', '{!TutorialStep}', false);" reRender="none"/>
+                  <apex:commandButton value="Save" styleclass="slds-button slds-button_neutral" onclick="updateStep('step9', '{!TutorialStep}', !isValidFilter({!filterInfo.hasFilterCriteriaVariable}));saveSettingCriteria({!filterInfo.hasFilterCriteriaVariable});" reRender="none"/>
+                  </div>
+                  </apex:outputPanel>
+                </div>
+              </div>
+            </apex:outputPanel>  
+            </div>
+          </div>
+          <div class="slds-backdrop slds-backdrop_open"></div>
+        </div>
+<!-- / New Filter Criteria -->
+        
+<!-- Edit Criterion -->
+        <div id="editCriterion" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Edit Filter</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="clearSelectedCriterion();hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <apex:outputPanel id="EditCriterionModal">
+              <div class="slds-modal__content slds-p-around_small">
+                <div class="slds-grid slds-wrap">
+                      <div id="editFieldSelection" class="slds-size_1-of-1">
+                        <apex:outputPanel id="editFields">
+                            <p style="float:left;">Field:</p> 
+                            <p style="float:right;"><c:Paginate pageController="{!fieldsController}" renderedComponent="editFields" statusDisplay="loading"/></p>
+                            <apex:selectList styleClass="slds-select" value="{!filterInfo.editCriterion.Field}" id="filterField" size="4"> 
+                            <apex:actionSupport event="onchange" action="{!clearFilterOperator}" rerender="filterCondition, filterValue, fkObjFields2, editCriteriaInformation" oncomplete="setFildSelectListSize('edit', {!ParentFieldListForEditCriterion.size});" status="loading">
+                              <apex:param assignTo="{!context}" value="target" name="parentFieldContext2"/>
+                            </apex:actionSupport>
+                            <apex:selectOptions value="{!FieldList}"/>
+                            </apex:selectList>
+                        </apex:outputPanel>
+                      </div>  
+                      <div id="editFKSelection" class="slds-size_1-of-2">
+                        <apex:outputPanel id="fkObjFields2">
+                          <apex:outputPanel rendered="{!ParentFieldListForEditCriterion.size > 0}">
+                            <p style="float:left;">&nbsp;</p>
+                            <p style="float:right;"><c:Paginate pageController="{!parentFieldsController}" renderedComponent="fkObjFields2" statusDisplay="loading"/></p>
+                            <apex:selectList styleClass="slds-select" value="{!filterInfo.parentField}" size="4"> 
+                            <apex:actionSupport event="onchange" action="{!clearFilterOperator}" rerender="filterCondition, filterValue, editCriteriaInformation" status="loading">
+                              <apex:param assignTo="{!context}" value="parent" name="parentFieldContext2"/>
+                            </apex:actionSupport>
+                            <apex:selectOptions value="{!ParentFieldListForEditCriterion}"/> 
+                            </apex:selectList>
+                          </apex:outputPanel>
+                        </apex:outputPanel>
+                      </div>
+                      <div class="slds-size_1-of-1"> 
+                        <div id="EditCriteriaFieldError" style="display:none;"><font style="color:red">This is a required Field.</font></div>
+                        <br/>
+                        <apex:outputPanel id="filterCondition">
+                        <apex:outputPanel rendered="{!OR(AND(filterInfo.editCriterion.Field != '', ParentFieldListForEditCriterion.size > 0, filterInfo.parentField != null), AND(filterInfo.editCriterion.Field != '', ParentFieldListForEditCriterion.size == 0))}">
+                        Logic:
+                        <br/>
+                            <apex:selectList id="EditCriteriaOper" styleClass="slds-select" value="{!filterInfo.editCriterion.Logic}" size="1">
+                                <apex:actionSupport event="onchange" action="{!updateCriteriaInformationText}" rerender="filterValue, editCriteriaInformation" status="loading"/>
+                                <apex:selectOptions value="{!FilterOperators}"/>
+                            </apex:selectList>
+                            <div id="EditCriteriaOperError" style="display:none;"><font style="color:red">This is a required Field.</font></div>
+                        </apex:outputPanel>
+                        </apex:outputPanel>
+                        <br/>
+                        <apex:outputPanel id="filterValue">
+                        <apex:outputPanel rendered="{!IF(filterInfo.editCriterion.Logic != '', true, false)}">
+                        Condition:
+                        <br/>
+                                    <apex:outputPanel layout="block" id="filterDataEntry2" rendered="{!NOT(filterInfo.hasCriteriaPicklist)}"> 
+                                        <apex:inputText styleClass="slds-input" value="{! filterInfo.filterCondition }"/>
+                                    </apex:outputPanel><div id="editConditionError" style="display:none"></div>
+                                    
+                                    <apex:outputPanel layout="block" id="filterPicklist2" rendered="{!filterInfo.hasCriteriaPicklist}"> 
+                                        
+                                        <apex:selectList size="1" styleClass="slds-select" value="{! filterInfo.filterCondition }" rendered="{!NOT(filterInfo.allowMultiselect)}">
+                                            <apex:actionSupport event="onchange" action="{!updateCriteriaInformationText}" rerender="filterCriteriaVar2, setDateVar2, editCriterionButtons, editCriteriaInformation" status="loading"/>
+                                            <apex:selectOptions value="{! filterCriteriaOptions }"/> 
+                                        </apex:selectList>
+                                        <apex:outputPanel id="editCriteriaInformation">
+                                            <apex:outputPanel rendered="{!filterInfo.editCriterionInfo != null}">
+                                                <div class="slds-notify_container" style="position:relative;">
+                                                    <div class="slds-notify slds-notify_toast slds-theme_warning" role="alert">
+                                                        <b>{!filterInfo.editCriterionInfo}</b>
+                                                    </div>
+                                                </div>
+                                            </apex:outputPanel>
+                                        </apex:outputPanel>
+                                        <apex:selectList size="3" multiselect="true" styleClass="slds-select" value="{! filterInfo.filterConditions }" rendered="{!filterInfo.allowMultiselect}">
+                                            <apex:actionSupport event="onchange" action="{!filterInfo.buildCriterionStringFromMultiselect}" rerender="filterCriteriaVar2, setDateVar2, newCriterionButtons" status="loading"/>
+                                            <apex:selectOptions value="{! filterCriteriaOptions }"/> 
+                                        </apex:selectList>
+                                        <apex:outputPanel id="filterCriteriaVar2" >
+                                            <apex:outputPanel rendered="{!filterInfo.hasFilterCriteriaVariable}">
+                                                <br/>
+                                                <apex:outputText value="Number"/>
+                                                <br/>                       
+                                                <apex:inputText id="editFilterCon" styleClass="slds-input" value="{! filterInfo.filterConditionVar }"/>
+                                                <div id="editCriteriaVariableError" style="display:none;"><font style='color:red'>You must input a number before saving.</font></div>
+                                            </apex:outputPanel>
+                                        </apex:outputPanel> 
+                                        
+                                        <apex:outputPanel id="setDateVar2" >  
+                                            <apex:outputPanel rendered="{!filterInfo.hasDateSelect}" id="panelForSelectDate2">
+                                                <br/> 
+                                                <apex:outputText value="Date" rendered="{!filterInfo.hasDateSelect}"/>
+                                                <br/>
+                                                <script>
+                                                    //Verify namespace is ready
+                                                    var dsh = dsh || {};
+                                                    dsh.j$ = jQuery.noConflict();    
+                                                    
+                                                    dsh.j$(function() {
+                                                       dsh.j$( '[id$=datetimepicker2]' ).datetimepicker();
+                                                       dsh.j$( '[id$=datepicker2]' ).datepicker();
+                                                    });
+                                                </script>
+                                                <apex:inputText styleClass="slds-input" id="datepicker2" value="{!filterInfo.datePicker}" rendered="{!filterInfo.hasSelectDateVariable}"/>
+                                                <apex:inputText styleClass="slds-input" id="datetimepicker2" value="{!filterInfo.dateTimePicker}" rendered="{!filterInfo.hasSelectDateTimeVariable}"/>
+                                                <br/>
+                                                <apex:outputText value="(ex: 01/11/2011 01:00)" rendered="{!filterInfo.hasSelectDateTimeVariable}"/>        
+                                            </apex:outputPanel>
+                                        </apex:outputPanel>
+                                    </apex:outputPanel>
+                        </apex:outputPanel>
+                        </apex:outputPanel>
+                    </div>
+                    </div>
+
+              </div>
+              </apex:outputPanel>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                  <apex:outputPanel id="editCriterionButtons">
+                  <button type="button" class="slds-button slds-button_neutral" onclick="hideAllModals();">Cancel</button>
+                  <button type="button" onclick="updateSettingCriteria({!filterInfo.hasFilterCriteriaVariable});" class="slds-button slds-button_neutral">Update</button>
+                  </apex:outputPanel>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="slds-backdrop slds-backdrop_open"></div>
+        </div>
+<!-- / Edit Criterion -->
+
+<!-- Activate Setting -->
+      <div id="activateSetting" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Storage Recycle Job Activation</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <div class="slds-modal__content slds-p-around_small">
+                <div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px">
+                <apex:outputPanel id="activationNotification">
+                  <center>
+                  <apex:outputPanel rendered="{!!settingConfig.SH2__Force_Preview__c}">
+                    <b>Please Note: To prevent important data from being deleted accidentally, we recommend keeping the Storage Recycle Job inactive until the deletion filters are fully defined.</b>
+                  </apex:outputPanel>
+                  <apex:outputPanel rendered="{!settingConfig.SH2__Force_Preview__c}">
+                    <b>The list of records below contains a preview of records that will be deleted by this Storage Recycle Job. Please confirm that the records found in the list below meet your desired filters.</b>
+                  </apex:outputPanel>
+                  </center>
+                </apex:outputPanel>
+                </div>
+                <apex:outputPanel id="activationPreview">
+                    <c:DSH_RecordPreview setting="{!srjInfo.selectedSetting}" hasOwnerFld="{!hasOwnerField}" pageController="{!previewController}" rendered="{!AND(settingConfig.SH2__Force_Preview__c, renderRecordPreview)}"/>
+                </apex:outputPanel>
+              </div>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                <apex:outputPanel id="activationButtons">
+                <div id="step10" style="display:inline-block;"> 
+                  <button type="button" class="slds-button slds-button_neutral" onclick="updateStep('step11', '{!TutorialStep}', false);hideAllModals();">Keep Inactive</button>
+                  <button type="button" onclick="updateStep('step11', '{!TutorialStep}', false);activateSetting();" class="slds-button slds-button_neutral">Activate</button>
+                </div>
+                </apex:outputPanel>
+                </div>
+              </div>
+            </div>
+        </div>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+      </div>
+<!-- /Activate Setting -->
+
+<!-- Deletion Warning -->
+      <div id="deletionWarning" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Deletion Warning</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <div class="slds-modal__content slds-p-around_small">
+                <apex:outputPanel id="deletionWarningMessage">
+                <center>
+                <div class="slds-notify_container" style="position:relative;">
+                  <div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px" role="alert">
+                    <span class="slds-assistive-text">Error</span>
+                    <div class="slds-notify__content slds-grid">
+                      <div class="slds-col slds-align-middle">
+                        <div class="slds-text-longform">
+                          <apex:outputPanel rendered="{!srjInfo.srjHasBackupFiles}">
+                          <b>Warning: Deleting this Storage Recylce Job, will also delete all of the backup files created by Storage Helper for this Storage Recycle Job. 
+                          If you would like to keep the backup files you may click the 'View Backup Files' button below, then download the backups you would like to keep.
+                          </b>
+                          </apex:outputPanel>
+                          <apex:outputPanel rendered="{!!srjInfo.srjHasBackupFiles}">
+                          <b>Are you sure you would like to delete this Storage Recycle Job?
+                          </b>
+                          </apex:outputPanel>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                </center>
+                </apex:outputPanel>
+              </div>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                  <apex:outputPanel id="deletionButtons">
+                  <button type="button" class="slds-button slds-button_neutral" onclick="hideAllModals();">Cancel</button>
+                  <apex:outputPanel rendered="{!srjInfo.srjHasBackupFiles}">
+                  <button type="button" class="slds-button slds-button_neutral" onclick="showBackupDownload();">View Backup Files</button>
+                  </apex:outputPanel>
+                  <button type="button" onclick="deleteSeletedSetting();hideAllModals();" class="slds-button slds-button_neutral">Delete</button>
+                  </apex:outputPanel>
+                </div>
+              </div>
+            </div>
+        </div>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+      </div>
+<!-- /Deletion Warning -->
+
+<!-- Backup Settings -->
+      <div id="backupConfig" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Storage Helper Backups</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <div class="slds-modal__content slds-p-around_small" style="min-height:190px;">
+              <apex:outputPanel id="backupHelpText">
+              </apex:outputPanel>
+                <apex:outputPanel id="backupSettingFields">
+                Backup Mode:<br/>
+                <apex:selectList size="1" styleClass="slds-select" value="{! srjInfo.selectedSetting.Backup_Mode__c }">
+                  <apex:actionSupport event="onchange" rerender="fieldBackupSelect, srjConfigButtons, cascadeDeleteObjects, indexArchives" status="loading"/>
+                  <apex:selectOptions value="{!BackupModes}"/>
+                </apex:selectList>
+                
+                <apex:outputPanel id="indexArchives">
+                  <apex:outputPanel rendered="{!IF(srjInfo.selectedSetting.SH2__Backup_Mode__c == 'Off', true, false)}">
+                    <br/>
+                    <div class="slds-box slds-box_x-small slds-theme_error">
+                        Warning:  Disabling Storage Helper backups is <strong>not recommended</strong>. Only disable this setting if you are 
+                        confident that your existing backup solution will enable you to quickly restore any records that were mistakenly 
+                        deleted due to inaccurate filter criteria. 
+                    </div>
+                  </apex:outputPanel>
+                  <apex:outputPanel rendered="{!IF(OR(srjInfo.selectedSetting.SH2__Backup_Mode__c == 'Backup All Fields', srjInfo.selectedSetting.SH2__Backup_Mode__c == 'Select Fields To Backup'), true, false)}">
+                    Enable Search For Archived Records:
+                    <img width="18px" height="18px" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/info_60.png')}" onmouseover="dsh.j$('#searchInfo').toggle();" onmouseout="dsh.j$('#searchInfo').toggle();"/><br/>
+                        <div class="slds-col" style="max-height:0px;overflow:visible;overflow-y:visible;position:relative;">
+                            <div id="searchInfo" class="slds-popover slds-theme_info" role="dialog" style="display:none;">
+                              <div class="slds-popover__body">This enables the ability to search records that are backed up by Storage Helper. Please note that a small amount of data storage will be used with this setting enabled.
+                              </div>
+                            </div>
+                        </div>
+                    <apex:inputCheckbox style="height:17px;width:17px;" value="{!srjInfo.selectedSetting.SH2__Index_Archived_Records__c}"/>
+                  </apex:outputPanel>
+                </apex:outputPanel>
+                
+                <apex:outputPanel id="fieldBackupSelect">
+                  <apex:outputText style="color:red;" rendered="{!AND(srjInfo.selectedSetting.SH2__Backup_Mode__c == 'Backup All Fields', UnableToBackupAllFields)}" value="The object this Storage Recycle Job is created for contains more than 300 fields. The maximum number of fields that can be backed up is 300. Please change the backup mode to select which fields to backup."/>
+                  <apex:outputPanel rendered="{!IF(srjInfo.selectedSetting.SH2__Backup_Mode__c == 'Select Fields To Backup', true, false)}">
+                    <center>
+                    <apex:outputText style="color:red;" value="Before saving you must select one or more field to backup." rendered="{!backupInfo.mainbackupFieldsController.SelectedListSize == 0}"/>
+                    <apex:outputText style="color:red;" rendered="{!backupInfo.mainbackupFieldsController.UnableToAddMoreItems}" value="Unable to backup more than 300 fields."/>
+                    </center>
+                    <br/>
+                    <table>
+                    <tr>
+                    <td class="slds-size_3-of-7">
+                    <apex:outputPanel id="availableFields">
+                    <center>Available Fields</center>
+                    <apex:selectList size="10" style="min-height:342px;" styleClass="slds-select" value="{!backupInfo.mainbackupFieldsController.itemsToAdd}" multiselect="true">
+                      <apex:selectOptions value="{!backupInfo.mainbackupFieldsController.available}"/>
+                    </apex:selectList>
+                    <c:Paginate pageController="{!backupInfo.mainbackupFieldsController.availableValueController}" renderedComponent="availableFields" statusDisplay="loading"/>
+                    </apex:outputPanel>
+                    </td>
+                    <td class="slds-size_1-of-7">
+                      <center>
+                        <apex:commandButton styleclass="slds-button slds-button_neutral" style="max-height:30px;" image="{! URLFOR($Asset.SLDS, 'assets/icons/utility/right_60.png')}" action="{!backupInfo.updateBackupFieldLists}" rerender="fieldBackupSelect, srjConfigButtons" disabled="{!backupInfo.mainbackupFieldsController.UnableToAddMoreItems}" status="loading">
+                          <apex:param assignTo="{!backupInfo.backupFieldSelectionContext}" value="add" name="addField"/>
+                        </apex:commandButton><br/><br/>
+                        <apex:commandButton styleclass="slds-button slds-button_neutral" style="max-height:30px;" image="{! URLFOR($Asset.SLDS, 'assets/icons/utility/left_60.png')}" action="{!backupInfo.updateBackupFieldLists}" rerender="fieldBackupSelect, srjConfigButtons" status="loading">
+                          <apex:param assignTo="{!backupInfo.backupFieldSelectionContext}" value="remove" name="removeField"/>
+                        </apex:commandButton>
+                      </center>                     
+                    </td>
+                    <td class="slds-size_3-of-7">
+                    <apex:outputPanel >  
+                    <center>Selected Fields</center>
+                    <apex:selectList size="10" style="min-height:342px;" styleClass="slds-select" value="{!backupInfo.mainbackupFieldsController.itemsToRemove}" multiselect="true">
+                      <apex:selectOptions value="{!backupInfo.mainbackupFieldsController.selected}"/>
+                    </apex:selectList>
+                    <apex:outputPanel rendered="{!AND(backupInfo.mainbackupFieldsController != null, backupInfo.mainbackupFieldsController.availableValueController != null, backupInfo.mainbackupFieldsController.availableValueController.listObjects.size>700)}"><br/><br/></apex:outputPanel>
+                    </apex:outputPanel>
+                    </td>
+                    </tr>
+                    </table>
+                  </apex:outputPanel>
+                
+                <apex:outputPanel id="backupChildWarning" rendered="{!AND(ChildObjectsWithTooManyFieldsToBackup.size > 0, srjInfo.selectedSetting.SH2__Backup_Mode__c != 'Off')}">
+                  <div class="slds-notify_container" style="position:relative;" onClick="showBackupChildObjects();">
+                    <div class="slds-notify slds-notify_alert slds-theme_alert-texture" style="min-width:0px" role="alert">
+                      <div class="slds-text-longform">
+                      <span class="slds-assistive-text">Required Cascade Deletion Objects</span>
+                      <center>
+                      <b>
+                      <apex:commandLink rerender="none" onClick="showBackupChildObjects();"><h2>Cascade delete objects that contain too many fields to backup were found. Please click here to select which fields to backup for the objects found.</h2></apex:commandLink>
+                      </b>
+                      </center>
+                      </div>
+                    </div>
+                  </div>
+                </apex:outputPanel>
+                
+                </apex:outputPanel>
+                </apex:outputPanel>
+              </div>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                  <apex:outputPanel id="srjConfigButtons">
+                  <button type="button" class="slds-button slds-button_neutral" onclick="hideAllModals();">Cancel</button>
+                  <apex:commandbutton rendered="{!backupInfo.backupEditMode}" action="{!updateSRJBackupConfig}" status="loading" value="Save" disabled="{!OR(AND(srjInfo.selectedSetting.SH2__Backup_Mode__c == 'Select Fields To Backup', backupInfo.mainbackupFieldsController.SelectedListSize == 0), AND(srjInfo.selectedSetting.SH2__Backup_Mode__c == 'Backup All Fields', backupInfo.mainbackupFieldsController.UnableToAddMoreItems))}" styleclass="slds-button slds-button_neutral" reRender="activationPreview, backupInfoPanel" onComplete="hideAllModals();"/>
+                  <apex:commandbutton rendered="{!!backupInfo.backupEditMode}" action="{!updateSRJBackupConfig}" status="loading" value="Next" disabled="{!OR(AND(srjInfo.selectedSetting.SH2__Backup_Mode__c == 'Select Fields To Backup', backupInfo.mainbackupFieldsController.SelectedListSize == 0), AND(srjInfo.selectedSetting.SH2__Backup_Mode__c == 'Backup All Fields', backupInfo.mainbackupFieldsController.UnableToAddMoreItems))}" styleclass="slds-button slds-button_neutral" reRender="activationPreview, backupInfoPanel" onComplete="displayActivationConfigAfterBackupConfig();updateStep('step10', '{!TutorialStep}', false);"/>
+                  </apex:outputPanel>
+                </div>
+              </div>
+            </div>
+        </div>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+      </div>
+<!-- /Backup Settings -->
+
+<!-- Cascade Delete Children -->
+      <div id="cascadeDeleteObjectList" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Storage Helper Backups</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="hideChildBackupConfig();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <div class="slds-modal__content slds-p-around_small">
+                <apex:outputPanel id="cascadeDeleteObjects">
+                <div class="slds-notify_container" style="position:relative;">
+                  <div class="slds-notify slds-notify_alert slds-theme_alert-texture" style="min-width:0px" role="alert">
+                    <div class="slds-text-longform">
+                    <span class="slds-assistive-text">Required Cascade Deletion Objects</span>
+                    <b>
+                    <h2>Below is a list of child objects that will be cascade deleted, but have too many fields to backup. To ensure the important fields are being backed up, click 'Select Fields To Backup' link next to the child objects to configure what fields will be backed up.<br/>
+                    <br/>
+                    If the backup fields are not configured, Storage Helper will select 300 fields at random.</h2>
+                    </b>
+                    </div>
+                  </div>
+                </div>
+              <apex:outputPanel id="backupChildObjectTable">
+                <table class="slds-table slds-table_bordered">
+                  <thead>
+                    <tr class="slds-no-hover">
+                      <th class="slds-text-heading_label slds-size_3-of-5" scope="col">Object Name</th>
+                      <th class="slds-text-heading_label slds-size_2-of-5" scope="col"><center>Backup Configuration</center></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <apex:repeat value="{!childObjectsWithTooManyFieldsToBackup}" var="o">
+                      <tr class="slds-hint-parent">
+                        <td>{!o}</td>
+                        <td><center>
+                          <apex:commandLink value="Select Fields To Backup" action="{!clearCascadeBackupController}" rerender="cascadeDeleteFields" status="loading" oncomplete="showChildBackupModal();">
+                            <apex:param assignTo="{!srjInfo.cascadeDeleteObject}" value="{!o}" name="childObjectName"/>
+                          </apex:commandLink>
+                        </center></td>
+                      </tr>
+                    </apex:repeat>
+                  </tbody>
+                </table>
+              </apex:outputPanel>
+              </apex:outputPanel>
+              </div>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                  <apex:outputPanel id="cascadeObjectsButtons">
+                  <button type="button" class="slds-button slds-button_neutral" onclick="hideChildBackupConfig();">Back</button>
+                  </apex:outputPanel>
+                </div>
+              </div>
+            </div>
+        </div>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+      </div>
+<!-- /Cascade Delete Children -->
+
+<!-- Cascade Delete Backup Fields -->
+      <div id="cascadeDeleteBackup" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Storage Helper Backups</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="clearCascadeDeleteSettings();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <apex:outputPanel id="cascadeDeleteFields">
+              <div class="slds-modal__content slds-p-around_small">
+                <apex:outputPanel id="cascadeFieldBackupSelect">
+                    <center>
+                    <apex:outputText style="color:red;" value="Before saving you must select one or more field to backup." rendered="{!backupInfo.childbackupFieldsController.SelectedListSize == 0}"/>
+                    <apex:outputText style="color:red;" rendered="{!backupInfo.childbackupFieldsController.UnableToAddMoreItems}" value="Unable to backup more than 300 fields."/>
+                    </center>
+                    <br/>
+
+                    <table>
+                    <tr>
+                    <td class="slds-size_3-of-7">
+                    <apex:outputPanel id="cascadeAvailableFields">
+                    <center>Available Fields</center>
+                    <apex:selectList size="10" style="min-height:342px;" styleClass="slds-select" value="{!backupInfo.childbackupFieldsController.itemsToAdd }" multiselect="true">
+                      <apex:selectOptions value="{!backupInfo.childbackupFieldsController.available}"/>
+                    </apex:selectList>
+                    <c:Paginate pageController="{!backupInfo.childbackupFieldsController.availableValueController}" renderedComponent="cascadeAvailableFields" statusDisplay="loading"/>
+                    </apex:outputPanel>
+                    </td>
+                    <td class="slds-size_1-of-7">
+                      <center>
+                        <apex:commandButton styleclass="slds-button slds-button_neutral" style="max-height:30px;" image="{! URLFOR($Asset.SLDS, 'assets/icons/utility/right_60.png')}" action="{!backupInfo.updateBackupFieldLists}" rerender="cascadeFieldBackupSelect, cascadeConfigButtons" disabled="{!backupInfo.childbackupFieldsController.UnableToAddMoreItems}" status="loading">
+                          <apex:param assignTo="{!backupInfo.backupFieldSelectionContext}" value="childAdd" name="addChildField"/>
+                        </apex:commandButton><br/><br/>
+                        <apex:commandButton styleclass="slds-button slds-button_neutral" style="max-height:30px;" image="{! URLFOR($Asset.SLDS, 'assets/icons/utility/left_60.png')}" action="{!backupInfo.updateBackupFieldLists}" rerender="cascadeFieldBackupSelect, cascadeConfigButtons" status="loading">
+                          <apex:param assignTo="{!backupInfo.backupFieldSelectionContext}" value="childRemove" name="removeChildField"/>
+                        </apex:commandButton>
+                      </center>                     
+                    </td>
+                    <td class="slds-size_3-of-7">
+                    <apex:outputPanel >  
+                    <center>Selected Fields</center>
+                    <apex:selectList size="10" style="min-height:342px;" styleClass="slds-select" value="{!backupInfo.childbackupFieldsController.itemsToRemove }" multiselect="true">
+                      <apex:selectOptions value="{!backupInfo.childbackupFieldsController.selected}"/>
+                    </apex:selectList>
+                    <apex:outputPanel rendered="{!AND(backupInfo.childbackupFieldsController != null, backupInfo.childbackupFieldsController.availableValueController != null, backupInfo.childbackupFieldsController.availableValueController.listObjects.size>700)}"><br/><br/></apex:outputPanel>
+                    </apex:outputPanel>
+                    </td>
+                    </tr>
+                    </table>
+                </apex:outputPanel>
+              </div>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                  <apex:outputPanel id="cascadeConfigButtons">
+                  <button type="button" class="slds-button slds-button_neutral" onclick="clearCascadeDeleteSettings();">Cancel</button>
+                  <apex:commandbutton action="{!updateSRJBackupConfig}" rerender="backupInfoPanel" status="loading" value="Save" disabled="{!OR(backupInfo.childbackupFieldsController.SelectedListSize == 0, backupInfo.childbackupFieldsController.UnableToAddMoreItems)}" styleclass="slds-button slds-button_neutral" onComplete="showBackupChildObjects();"/>
+                  </apex:outputPanel>
+                </div>
+              </div>
+              </apex:outputPanel>
+            </div>
+        </div>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+      </div>
+<!-- /Cascade Delete Backup Fields -->
+
+<!-- Backup Download -->
+      <div id="backupDownload" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Storage Helper Backup Files</h2>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <div class="slds-modal__content slds-p-around_small">
+                <apex:outputPanel id="backupDownloadConfig">
+                Select What Backup Files to Display:
+                <apex:selectList styleClass="slds-select" value="{!backupInfo.downloadBackupFileMode}" size="1">
+                  <apex:actionSupport event="onchange" action="{!buildBackupPaginationController}" rerender="backupTable" status="loading"/>
+                  <apex:selectOption itemValue="" itemLabel="None"/>
+                  <apex:selectOption itemValue="all" itemLabel="All Backup Files"/>
+                  <apex:selectOption itemValue="range" itemLabel="Backup Files Created In a Given Date Range"/>
+                </apex:selectList>
+                <apex:outputPanel id="backupError">
+                    <center><apex:outputText value="{!backupInfo.backupFileMessage}" style="color:red;" rendered="{!backupInfo.backupFileMessage != null}"/></center>
+                </apex:outputPanel>
+                <apex:outputPanel id="backupTable">
+                  <apex:outputPanel rendered="{!backupInfo.downloadBackupFileMode == 'range'}">
+                    <script>
+                        //Verify namespace is ready
+                        var dsh = dsh || {};
+                        dsh.j$ = jQuery.noConflict();    
+                        
+                        dsh.j$(function() {
+                           dsh.j$( '[id$=fromDate]' ).datepicker();
+                           dsh.j$( '[id$=toDate]' ).datepicker();
+                        });
+                    </script>
+                    <div class="slds-grid">
+                      <div class="slds-size_1-of-2 slds-m-around_x-small">
+                      From Date: <apex:inputText id="fromDate" styleClass="slds-input" value="{!backupInfo.backupFromDate}"/><br/>
+                      </div>
+                      <div class="slds-size_1-of-2 slds-m-around_x-small">
+                      To Date: <apex:inputText id="toDate" styleClass="slds-input" value="{!backupInfo.backupToDate}"/>
+                      </div>
+                    </div>
+                    <center><apex:commandButton action="{!buildBackupPaginationController}" rerender="csvTable, backupError" status="loading" value="Find Backup Files" styleclass="slds-button slds-button_neutral"/></center>
+                  </apex:outputPanel>
+                  <apex:outputPanel id="csvTable">
+                    <apex:outputPanel rendered="{!AND(OR(AND(backupInfo.downloadBackupFileMode == 'range', OR(backupInfo.backupFromDate != null , backupInfo.backupToDate != null)), backupInfo.downloadBackupFileMode == 'all'), backupInfo.backupFileMessage == null, BackupAttachments.size > 0)}">
+                      <br/>
+                      <center><apex:outputText value="A maximum of 10,000 backup files have been retrieved. If the backup file you are looking for is not in the list, try searching with a reduced date range." style="color:red;" rendered="{!BackupAttachments.size >= 10000}"/></center>
+                      <table class="slds-table slds-table_bordered slds-scrollable_x" style="max-height:200px">
+                        <thead>
+                          <tr class="slds-no-hover">
+                            <th class="{!IF(hasOwnerField, 'slds-text-heading_label slds-size_2-of-5', 'slds-text-heading_label slds-size_4-of-5')}" scope="col">Backup Name</th>
+                            <th class="slds-text-heading_label slds-size_1-of-5" scope="col">Download</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <apex:repeat value="{!BackupAttachments}" var="r">
+                            <tr class="slds-hint-parent">
+                                <td class="slds-size_2-of-5 slds-truncate" style="max-width:220px;" data-label="{!recordNameField}">
+                                  <apex:outputLink value="/{!r.recId}" target="_blank" rendered="{! $User.UIThemeDisplayed == 'Theme3' }">{!r.name}</apex:outputLink>
+                                  <apex:outputLink value="/{!r.recId}" rendered="{! $User.UIThemeDisplayed != 'Theme3' }">{!r.name}</apex:outputLink><br/>
+                                </td>
+                                <td class="slds-size_1-of-5 slds-truncate" data-label="delete">
+                                  <apex:outputLink value="/servlet/servlet.FileDownload?file={!r.recId}" target="_blank">Download</apex:outputLink>
+                                </td>
+                            </tr>
+                          </apex:repeat>
+                        </tbody>
+                      </table>
+                      <p style="float:right;"><c:Paginate pageController="{!backupInfo.backupController}" renderedComponent="csvTable" statusDisplay="loading"/></p>
+                    </apex:outputPanel>
+                    <apex:outputPanel rendered="{!AND(backupAttachments.size == 0, backupInfo.downloadBackupFileMode != '')}">
+                      <br/>
+                      <center>No Backup Files Found.</center>
+                    </apex:outputPanel>
+                  </apex:outputPanel>
+                </apex:outputPanel>
+                </apex:outputPanel>
+              </div>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                  <apex:outputPanel >
+                  <apex:commandButton styleclass="slds-button slds-button_neutral" action="{!goToBackupSearchPage}" value="Search Archived Records"/>
+                  <button type="button" class="slds-button slds-button_neutral" onclick="hideAllModals();">Cancel</button>
+                  </apex:outputPanel>
+                </div>
+              </div>
+            </div>
+        </div>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+      </div>
+<!-- /Backup Download -->
+        
+<!-- Setting Run Selection -->
+        <div id="manualRun" style="display:none;">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header" style="padding:0px;">
+                <div class="slds-notify_container" style="position:relative;">
+                  <div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px" role="alert">
+                    <span class="slds-assistive-text">Error</span>
+                    <div class="slds-notify__content slds-grid">
+                      <div class="slds-col slds-align-middle">
+                          <div class="slds-text-longform">
+                            <h3 class="slds-text-heading_small"><b>Before clicking run, we recommend taking the following steps to ensure valuable data will not be lost:</b></h3>
+                            <b>
+                            <ul>
+                              <li>Click the 'Preview Records' button on the detail tab for each Storage Recycle Job you plan to run.</li>
+                              <li>Confirm all important data is backed up, or enable data backups in Storage Helper for each Storage Recycle Job you are going to run.</li>
+                            </ul>
+                            </b>
+                          </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="hideAllModals();">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+                <apex:outputPanel id="manualRunComponent">
+                    <div class="slds-modal__content slds-p-around_small">
+                    <center>
+                    <section class="slds-card__body">
+                        <ul>
+                        <li class="slds-tile slds-hint-parent">
+                        <center>
+                        <div class="slds-small-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_1-of-1">
+                            <div class="slds-scrollable_x"> 
+                            <apex:outputPanel id="runSettings">
+                                <apex:pageBlock >
+                                    <apex:pageBlockTable value="{!srjInfo.activeSettingsToRun}" var="s" styleClass="slds-table slds-table_bordered" rendered="{!srjInfo.activeSettingsToRun.size > 0}">
+                                        <center>
+                                            <apex:column headerValue="Run">
+                                                <apex:facet name="header">
+                                                    <apex:inputCheckbox id="checkAllBox" value="{!srjInfo.selectAllToRun}">
+                                                        <apex:actionSupport event="onclick" action="{!srjInfo.selectAllAction}" reRender="runSettings, runButtons" status="loading"/>
+                                                    </apex:inputCheckbox>
+                                                </apex:facet>
+                                                <apex:inputCheckbox value="{!s.selected}">
+                                                    <apex:actionSupport event="onchange" rerender="runButtons" status="loading"/>
+                                                </apex:inputCheckbox>
+                                            </apex:column>
+                                            <apex:column headerValue="Setting Name">
+                                                <p class="slds-truncate">{!s.settingName}</p>
+                                            </apex:column>
+                                            <apex:column headerValue="Object Name">
+                                                <p class="slds-truncate">{!s.settingObject}</p>
+                                            </apex:column>
+                                        </center>
+                                    </apex:pageBlockTable>
+                                    <apex:outputPanel rendered="{!srjInfo.activeSettingsToRun.size == 0}">
+                                        There are no active settings to run.
+                                    </apex:outputPanel>
+                                </apex:pageBlock>
+                            </apex:outputPanel>
+                            </div>
+                        </div>
+                        </center>
+                        </li>
+                        </ul>
+                    </section>
+                    </center>
+                    </div>
+            
+                    <div class="slds-modal__footer">
+                        <div class="slds-x-small-buttons_horizontal">
+                         <apex:outputPanel id="runButtons">
+                          <button type="button" class="slds-button slds-button_neutral" onClick="hideAllModals();">Cancel</button>
+                          <apex:commandButton id="manualRunButton" styleClass="slds-button slds-button_neutral" onClick="runSettings();" value="Run" disabled="{!IF(numberOfSettingsToRun == 0, true, false)}" rerender="manualRunButton"/>
+                         </apex:outputPanel>
+                        </div>
+                    </div>
+                </apex:outputPanel>
+            </div>
+          </div>
+          <div class="slds-backdrop slds-backdrop_open"></div>
+        </div>
+<!-- / Setting Run Selection -->
+
+<!-- Edit Schedule -->
+        <div id="editSchedule" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+              <div class="slds-modal__header" style="padding:0px;">
+                <div class="slds-notify_container" style="position:relative;">
+                  <div class="slds-notify slds-notify_toast slds-theme_warning" style="min-width:0px" role="alert">
+                    <span class="slds-assistive-text">Warning</span>
+                    <div class="slds-notify__content slds-grid">
+                      <div class="slds-col slds-align-middle">
+                        <center>
+                        <h2 class="slds-text-heading_small">Please make sure all important data is backed up before Storage Helper is scheduled to run, or Storage Helper backups are enabled for the active Storage Recycle Jobs.</h2>
+                        </center>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="updateStep('step1.1', '{!TutorialStep}', false);hideEditSchedule(''); showElement('settingConfig');">
+                    <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                  <span class="slds-assistive-text">Close</span>
+                </button>
+              </div>
+              <div class="slds-modal__content slds-p-around_small">
+              
+              <apex:outputPanel id="setSchedule" >
+                Run Mode: 
+                    <apex:selectList id="selectedRunMode" styleClass="slds-select" value="{!settingConfig.SH2__Run_Mode__c}" size="1">
+                    <apex:actionSupport event="onchange" rerender="scheduleInputs, dataExportError, saveRunMode, nextDataExport" onComplete="hideSettingConfig();" status="loading"/>  
+                    <apex:selectOptions value="{!runModes}"/>
+                    </apex:selectList>
+                    <apex:outputPanel id="dataExportError">
+                    <apex:outputText value="A Salesforce export has not been detected. " style="color:red;" rendered="{!runAfterExportError}"/>
+                    <apex:outputLink value="/ui/setup/export/DataExportPage/d?setupid=DataManagementExport" target="_blank" rendered="{!runAfterExportError}">Click Here to create one.</apex:outputLink>
+                    </apex:outputPanel>
+                    <apex:outputPanel id="nextDataExport">
+                    <apex:outputText rendered="{!AND(!runAfterExportError, settingConfig.SH2__Run_Mode__c == 'After Export')}">The Next Salesforce Data Export Will Run: {!NextDataExportTime}</apex:outputText>
+                    </apex:outputPanel>
+                <br/><br/>
+                  <apex:outputPanel id="scheduleInputs">
+                  <apex:outputPanel rendered="{!settingConfig.SH2__Run_Mode__c == 'Scheduled'}">
+                      <apex:outputText value="Run Every:"/>
+                      <br/>
+                      <apex:inputText styleClass="slds-input" id="increment" style="width:50%;" value="{!increment}"/>
+                      <apex:selectList styleClass="slds-select" style="width:50%;" value="{!settingConfig.SH2__Unit__c}" size="1">
+                        <apex:selectOption itemValue="" itemLabel="- Select Unit -"/>
+                        <apex:selectOption itemValue="hour" itemLabel="Hour"/>
+                        <apex:selectOption itemValue="day" itemLabel="Day"/>
+                        <apex:selectOption itemValue="month" itemLabel="Month"/>
+                        <apex:selectOption itemValue="year" itemLabel="Year"/>
+                      </apex:selectList>
+                      <div id="incrementError" style="display:none;"><br/><font style="color:red">The scheduled increment must be a valid whole number greater than or equal to 1.</font></div>
+                      <br/> 
+                      <apex:outputText value="Next Scheduled Run"/>
+                      <br/>
+                      <apex:inputField styleClass="slds-input" id="nextRun" style="width:50%" value="{!settingConfig.SH2__Next_Scheduled_Run__c}"/>
+                      <div id="nextRunError" style="display:none;"><br/><font style="color:red">You must populate a value in the next scheduled run field.</font></div>
+                      <br/>
+                      <apex:outputText value="(ex: 01/11/2011 01:00 PM)"/>        
+                  </apex:outputPanel>
+                  </apex:outputPanel>
+              </apex:outputPanel>
+                
+              </div>
+              <div class="slds-modal__footer">
+                <div class="slds-x-small-buttons_horizontal">
+                  <button type="button" class="slds-button slds-button_neutral" onClick="updateStep('step1.1', '{!TutorialStep}', false);hideEditSchedule(''); showElement('settingConfig');">Cancel</button>
+                  <apex:commandButton id="saveRunMode" onclick="saveSchedule();" styleClass="slds-button slds-button_neutral" value="Save" rerender="none" oncomplete="updateStep('step1.1', '{!TutorialStep}', false);" disabled="{!runAfterExportError}"/>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="slds-backdrop slds-backdrop_open"></div>
+        </div>
+<!-- / Edit Schedule -->
+
+<!-- Non-Profit Discount -->
+    <div id="nfpDiscount" style="display:none">
+        <c:NFPDiscountForm pageController="{!nfpController}"/>
+    </div>
+<!-- / Non-Profit Discount -->
+
+<!--- Help screen -->
+      <div id="helpScreen" style="display:none">
+		    <c:DSH_FAQ />
+      </div>
+
+<!-- / Help screen -->
+
+<!-- Run Status -->
+    <div id="runStatus" style="display:none">
+        <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="max-height:80%;">
+            <apex:outputPanel id="runStatusInfo">
+                <div class="slds-modal__header">
+                    <h2 class="slds-text-heading_medium">Run Status: {!srjInfo.runStatusSetting.Name}</h2>
+                    <button type="button" class="slds-button slds-button_icon-inverse slds-modal__close" onClick="hideElement('runStatus');">
+                        <img width="60%" height="60%" src="{! URLFOR($Asset.SLDS, 'assets/icons/utility/close_60.png')}"></img>
+                        <span class="slds-assistive-text">Close</span>
+                    </button>
+                </div>
+                <div class="slds-modal__content slds-p-around_small">
+                    <center>
+                        <apex:outputPanel rendered="{!srjInfo.runStatusSetting.SH2__Status__c != 'Complete'}">
+                            <apex:outputPanel rendered="{!AND(srjInfo.runStatusSetting.SH2__Status__c != 'Running', srjInfo.runStatusSetting.SH2__Status__c != 'Error')}">
+                                <b>{!srjInfo.runStatusSetting.SH2__Status__c}</b><br/>
+                            </apex:outputPanel>
+                            <apex:outputPanel rendered="{!srjInfo.runStatusSetting.SH2__Status__c == 'Running'}">
+                                <b>{!srjInfo.runStatusSetting.SH2__Percent_Complete__c}% Complete</b><br/>
+                            </apex:outputPanel>
+                            <apex:outputPanel rendered="{!CONTAINS(srjInfo.runStatusSetting.SH2__Status__c, 'Backing Up')}">
+                                Please Note: When you select to backup records on a Storage Recycle Jobs, Storage Helper also backup child records that will be cascade deleted during the run of the Job. This process will take some time before the deletion of the target records will occur.
+                            </apex:outputPanel>
+                            <apex:outputPanel rendered="{!CONTAINS(srjInfo.runStatusSetting.SH2__Status__c, 'Calculating Number')}">
+                                Please Note: Before the deletion the target records for a Storage Recycle Job can occur, Storage Helper calculates the number of child records that will get cascade deleted during the run of the Job. This will allow us to have an accurate calculation for the savings that Storage Helper provides your organization. 
+                            </apex:outputPanel>
+                            <apex:outputPanel rendered="{!srjInfo.RunStatusSetting.SH2__Status__c == 'Error'}">
+                                There appears to have been an issue when attempting to process this Storage Recycle Job. Please reach out to <a style="color:blue" href="mailto:support@passagetech.com">support@passagetech.com</a> for help resolving this issue.
+                            </apex:outputPanel>
+                        </apex:outputPanel>
+                        <apex:outputPanel rendered="{!srjInfo.runStatusSetting.SH2__Status__c == 'Complete'}">
+                            <b>The Storage Recycle Job Has Completed</b>
+                        </apex:outputPanel>
+                    </center>
+                </div>
+                <div class="slds-modal__footer">
+                    <div class="slds-x-small-buttons_horizontal">
+                        <button type="button" class="slds-button slds-button_neutral" onClick="hideElement('runStatus')">Close</button>
+                    </div>
+                </div>
+            </apex:outputPanel>
+            </div>
+        </div>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </div>
+<!-- / Run Status -->
+     
+<!-- LOADING SCREEN -->
+        <div id="loading" style="display:none">
+          <div aria-hidden="false" role="dialog" class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container" style="min-width: 50px; width: 100px;">
+              <div class="slds-modal__content slds-p-around_small">
+              <center>
+              <div class="slds-spinner_large" background="#16325c">
+                  <img src="{! URLFOR($Asset.SLDS, 'assets/images/spinners/slds_spinner_brand.gif')}" alt="Loading..." />
+              </div>
+              </center>
+              </div>
+            </div>
+          </div>
+          <div class="slds-backdrop slds-backdrop_open"></div>
+        </div>
+<!-- / LOADING SCREEN -->
+
+      <div class="slds-grid">
+      <div class="slds-col slds-small-size_1-of-2 slds-medium-size_3-of-5 slds_large-size_8-of-12">
+        <center>
+        | <a href="mailto:support@passagetech.com">Contact Support</a> | <a href="https://appexchange.salesforce.com/listingDetail?listingId=a0N3000000B5fvwEAB&tab=r" target="_blank">Review Our AppExchange Listing</a> | <a href="https://www.passagetechnology.com" target="_blank">Visit Our Website</a> | <a href="https://passagetechnology.force.com/Services" target="_blank">Visit Our Dev Services Community</a> |
+        </center>
+      </div>
+      <div class="column region-sidebar slds-small-size_1-of-2 slds-medium-size_2-of-5 slds-large-size_3-of-12"></div>
+      </div>
+    </div>
+    <!-- / REQUIRED SLDS WRAPPER -->
+
+    </apex:form>
+    </body>
+</html>
+
+</apex:page>
